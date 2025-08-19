@@ -10,6 +10,142 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
+}
+
+
+enum GlobalRole {
+  SUPERADMIN
+  USER
+}
+
+enum OrgRole {
+  ADMIN
+  USER
+}
+
+model User {
+  id              Int             @id @default(autoincrement())
+  username        String
+  email           String          @unique
+  password        String
+  mobile          String          @unique
+  role            GlobalRole      @default(USER)
+  created_at      DateTime        @default(now())
+
+  organization    UserOrganization[]
+  device_access   UserDevice[]
+}
+
+model Organization {
+  id              Int               @id @default(autoincrement())
+  name            String
+  created_at      DateTime          @default(now())
+
+  users           UserOrganization[]
+  sites           Site[]
+  devices         Device[]
+}
+
+model UserOrganization {
+  id              Int                 @id @default(autoincrement())
+  user_id         Int
+  organization_id Int
+  role            OrgRole             @default(USER)
+
+  user            User                @relation(fields: [user_id],references: [id])
+  organization    Organization        @relation(fields: [organization_id],references: [id])
+
+  @@unique([user_id,organization_id])
+}
+
+model Site {
+  id              Int                 @id @default(autoincrement())
+  name            String
+  location        Json
+  organization_id Int
+  created_at      DateTime            @default(now())
+
+  organization    Organization        @relation(fields: [organization_id],references: [id])
+  devices         Device[]
+}
+
+
+model InstalledDevice {
+  id              Int                 @id @default(autoincrement())
+  imei            String              @unique
+  video_url       String
+  is_installed    Boolean             @default(true)
+  is_registered   Boolean             @default(false)
+}
+
+
+model Device {
+  id              Int                 @id @default(autoincrement())
+  imei            String              @unique
+  video_url       String
+  site_id         Int
+  organization_id Int
+  created_at      DateTime            @default(now())
+
+  users           UserDevice[]
+  garbagelog      GarbageLog[]
+  personlog       PersonLog[]
+  latestlog       LatestLog?
+  site            Site                @relation(fields: [site_id],references: [id])
+  organization    Organization        @relation(fields: [organization_id],references: [id])
+}
+
+model UserDevice {
+  id              Int                 @id @default(autoincrement())
+  user_id         Int
+  device_id       Int
+  user            User                @relation(fields: [user_id],references: [id])
+  device          Device              @relation(fields: [device_id],references: [id])
+
+  @@unique([user_id,device_id])
+}
+
+
+model GarbageLog {
+  id                Int                 @id @default(autoincrement())
+  device_id         Int
+  imei              String
+  organization_name String
+  site_name         String
+  date              DateTime
+  image             String
+  box_count         Int
+  
+  device            Device              @relation(fields: [device_id],references: [id])
+  created_at        DateTime
+}
+
+model PersonLog {
+  id                Int                 @id @default(autoincrement())
+  device_id         Int
+  imei              String
+  organization_name String
+  site_name         String
+  date              DateTime
+  image             String
+
+  device            Device              @relation(fields: [device_id],references: [id])
+  created_at        DateTime
+}
+
+model LatestLog {
+  id                Int                  @id @default(autoincrement())
+  device_id         Int                  @unique
+  imei              String
+  organization_name String
+  site_name         String
+  garbage_image     String
+  person_image      String
+
+  update_at         DateTime             @updatedAt
+  created_at        DateTime             @default(now())
+
+  device            Device               @relation(fields: [device_id],references: [id])
 }
