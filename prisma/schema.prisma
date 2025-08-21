@@ -78,6 +78,8 @@ model InstalledDevice {
   video_url       String
   is_installed    Boolean             @default(true)
   is_registered   Boolean             @default(false)
+  created_at      DateTime            @default(now())
+  updated_at      DateTime            @updatedAt
 }
 
 
@@ -87,6 +89,7 @@ model Device {
   video_url       String
   site_id         Int
   organization_id Int
+  max_count       Int?
   created_at      DateTime            @default(now())
 
   users           UserDevice[]
@@ -156,4 +159,5 @@ model Missedlog {
   problem           String
   created_at        DateTime             @default(now())
   is_verified       Boolean              @default(false)
+  updated_at        DateTime             @updatedAt
 }
