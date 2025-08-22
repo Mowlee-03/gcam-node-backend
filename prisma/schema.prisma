@@ -54,8 +54,8 @@ model UserOrganization {
   organization_id Int
   role            OrgRole             @default(USER)
 
-  user            User                @relation(fields: [user_id],references: [id])
-  organization    Organization        @relation(fields: [organization_id],references: [id])
+  user            User                @relation(fields: [user_id],references: [id],onDelete: Cascade,onUpdate: Cascade)
+  organization    Organization        @relation(fields: [organization_id],references: [id],onDelete: Cascade,onUpdate: Cascade)
 
   @@unique([user_id,organization_id])
 }
@@ -104,8 +104,8 @@ model UserDevice {
   id              Int                 @id @default(autoincrement())
   user_id         Int
   device_id       Int
-  user            User                @relation(fields: [user_id],references: [id])
-  device          Device              @relation(fields: [device_id],references: [id])
+  user            User                @relation(fields: [user_id],references: [id],onDelete: Cascade,onUpdate: Cascade)
+  device          Device              @relation(fields: [device_id],references: [id],onDelete: Cascade,onUpdate: Cascade)
 
   @@unique([user_id,device_id])
 }
