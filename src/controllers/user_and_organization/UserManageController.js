@@ -57,42 +57,49 @@ const createuser = async (req, res) => {
       if (!organizations || !Array.isArray(organizations) || organizations.length === 0) {
         return res.status(400).json({
           status: "error",
-          message: "At least one organization is required for USER role",
+          message: "At least one organization is required",
         });
       }
 
-      // Check that all org IDs exist
+      // Fetch orgs with names
       const orgIds = organizations.map(o => o.id);
       const orgsExist = await gcamprisma.organization.findMany({
         where: { id: { in: orgIds } },
-        select: { id: true },
+        select: { id: true, name: true },
       });
 
       const foundOrgIds = orgsExist.map(o => o.id);
       const missingOrgs = orgIds.filter(id => !foundOrgIds.includes(id));
+
       if (missingOrgs.length > 0) {
+        const missingOrgNames = missingOrgs.map(id => {
+          const org = organizations.find(o => o.id === id);
+          return org ? `id:${org.id}` : id;
+        });
         return res.status(400).json({
           status: "error",
           message: "Some organizations not found",
-          missingOrganizations: missingOrgs,
+          missingOrganizations: missingOrgNames,
         });
       }
 
       // Validate each organization individually
       for (const org of organizations) {
+        const orgData = orgsExist.find(o => o.id === org.id);
+
         if (!org.role) {
           return res.status(400).json({
             status: "error",
-            message: `org_role is required for organization ${org.id}`,
+            message: `org_role is required for organization '${orgData?.name || org.id}'`,
           });
         }
 
         if (org.role && !orgroles.includes(org.role)) {
           return res.status(400).json({
             status: "error",
-            message: "Invalid user role",
+            message: "Invalid org role",
             allowedroles: orgroles,
-            receivedrole: `Recieved role ${org.role} for ${org.id}`,
+            receivedrole: `Received role ${org.role} for organization '${orgData?.name || org.id}'`,
           });
         }
 
@@ -100,11 +107,11 @@ const createuser = async (req, res) => {
           if (!org.devices || org.devices.length === 0) {
             return res.status(400).json({
               status: "error",
-              message: `Devices are required for organization ${org.id} when org_role is USER`,
+              message: `Devices are required for organization '${orgData?.name || org.id}' when org_role is USER`,
             });
           }
 
-          // Check devices exist
+          // Check devices exist with org reference
           const devsExist = await gcamprisma.device.findMany({
             where: { id: { in: org.devices } },
             select: { id: true, organization_id: true },
@@ -115,7 +122,7 @@ const createuser = async (req, res) => {
           if (missingDevs.length > 0) {
             return res.status(400).json({
               status: "error",
-              message: `Some devices not found for organization ${org.id}`,
+              message: `Some devices not found for organization '${orgData?.name || org.id}'`,
               missingDevices: missingDevs,
             });
           }
@@ -125,7 +132,7 @@ const createuser = async (req, res) => {
           if (invalidDevs.length > 0) {
             return res.status(400).json({
               status: "error",
-              message: `Some devices do not belong to organization ${org.id}`,
+              message: `Some devices do not belong to organization '${orgData?.name || org.id}'`,
               invalidDevices: invalidDevs.map(d => d.id),
             });
           }

@@ -101,9 +101,9 @@ const updateOrganization = async (req,res) => {
             })
 
         }else{
-            return res.status(304).json({
+            return res.status(200).json({
                 status:"success",
-                message:"Not modified anything"
+                message:"No changes made"
             })
         }
         
