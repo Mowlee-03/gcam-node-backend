@@ -87,6 +87,7 @@ model Device {
   id              Int                 @id @default(autoincrement())
   imei            String              @unique
   video_url       String
+  name            String?
   location        Json?
   site_id         Int?
   organization_id Int
