@@ -5,6 +5,7 @@ const globalroles = Object.values(GlobalRole)
 const orgroles = Object.values(OrgRole)
 
 
+
 const createuser = async (req, res) => {
   const {
     username,
@@ -194,100 +195,97 @@ const createuser = async (req, res) => {
   }
 };
 
-
-
-const getuserdetail = async (req, res) => {
-  const { user_id } = req.params;
-  if (!user_id) {
-    return res.status(400).json({
-      status: "error",
-      message: "Bad request , user_id is required"
-    });
-  }
-
+// ✅ Get all users with org + device access
+const getAllUsers = async (req, res) => {
   try {
-    const user = await gcamprisma.user.findUnique({
-      where: { id: Number(user_id) },
+    const users = await gcamprisma.user.findMany({
       include: {
         organization: {
           include: {
-            organization: true, // includes org info
+            organization: true, // org info
           },
         },
         device_access: {
           include: {
-            device: true, // includes device info
+            device: true, // device info
           },
         },
       },
     });
 
-    if (!user) {
+    if (!users || users.length === 0) {
       return res.status(404).json({
         status: "error",
-        message: "User not found"
+        message: "No users found",
       });
     }
 
-    // --- SUPERADMIN: Full access
-    if (user.role === "SUPERADMIN") {
+    // Process each user into structured access response
+    const userAccessList = await Promise.all(
+      users.map(async (user) => {
+        // --- SUPERADMIN: Full access
+        if (user.role === "SUPERADMIN") {
+          return {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            mobile: user.mobile,
+            role: user.role,
+            organizations: "ALL",
+          };
+        }
 
-      return res.status(200).json({
-        status: "success",
-        data: {
-          user,
-          organizations: "ALL",
-          devices: "ALL",
-        },
-      });
-    }
+        // --- USER / ADMIN (org-level)
+        let orgAccess = [];
+        for (const orgLink of user.organization) {
+          const org = orgLink.organization;
 
-    // --- USER: need to check organization roles
-    let orgAccess = [];
+          if (orgLink.role === "ADMIN") {
+            // ADMIN inside org → all devices of that org
+            const allDevices = await gcamprisma.device.findMany({
+              where: { organization_id: org.id },
+            });
 
-    for (const orgLink of user.organization) {
-      const org = orgLink.organization;
+            orgAccess.push({
+              id: org.id,
+              name: org.name,
+              org_role: orgLink.role, // ✅ include org_role here
+              access: "ALL",
+              devices: allDevices,
+            });
+          } else {
+            // USER inside org → only specific devices linked
+            const allowedDevices = user.device_access
+              .filter((ud) => ud.device.organization_id === org.id)
+              .map((ud) => ud.device);
 
-      if (orgLink.role === "ADMIN") {
-        // ADMIN inside an org = all devices of that org
-        orgAccess.push({
-            id: org.id,
-            name: org.name,
-            access: "ALL",
-            devices: await gcamprisma.device.findMany({
-                where: { organization_id: org.id },
-            }),
-        });
-      } else {
-        // USER inside org = only specific devices
-        const allowedDevices = user.device_access
-          .filter((ud) => ud.device.organization_id === org.id)
-          .map((ud) => ud.device);
+            orgAccess.push({
+              id: org.id,
+              name: org.name,
+              org_role: orgLink.role, // ✅ include org_role here
+              access: "LIMITED",
+              devices: allowedDevices,
+            });
+          }
+        }
 
-        orgAccess.push({
-            id: org.id,
-            name: org.name,
-            access: "LIMITED",
-            devices: allowedDevices
-        });
-      }
-    }
-
-    return res.status(200).json({
-      status: "success",
-      data: {
-        user: {
+        return {
           id: user.id,
           username: user.username,
           email: user.email,
           mobile: user.mobile,
           role: user.role,
-        },
-        organizations: orgAccess,
-      },
+          organizations: orgAccess,
+        };
+      })
+    );
+
+    return res.status(200).json({
+      status: "success",
+      data: userAccessList,
     });
   } catch (error) {
-    console.error(error);
+    console.error("❌ Error fetching users:", error);
     return res.status(500).json({
       status: "error",
       message: "Internal Server Error",
@@ -297,35 +295,296 @@ const getuserdetail = async (req, res) => {
 };
 
 
-const getallusers = async (req,res) => {
-    try {
-        const usersdata = await gcamprisma.user.findMany({
-            include:{
-                organization:true,
-                device_access:true
-            }
-        })
 
-        return res.status(200).json({
-          status:"success",
-          data:usersdata
-        })
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({
-        status: "error",
-        message: "Internal Server Error",
-        error: error.message,
-        });
+
+const updateUser = async (req, res) => {
+  const { user_id } = req.params;
+  const {
+    username,
+    email,
+    password,
+    mobile,
+    role,
+    organizations, // optional [{ id, role, devices }]
+  } = req.body;
+
+  try {
+    // Fetch existing user with orgs/devices
+    const existingUser = await gcamprisma.user.findUnique({
+      where: { id: Number(user_id) },
+      include: {
+        organization: true, // [{ id, user_id, organization_id, role }]
+        device_access: true, // [{ id, user_id, device_id }]
+      },
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({ status: "error", message: "User not found" });
     }
-}
+
+    // ---------- BASIC FIELD CHANGES ----------
+    let updateData = {};
+
+    if (username && username !== existingUser.username) {
+      updateData.username = username;
+    }
+
+    if (email && email !== existingUser.email) {
+      const emailExists = await gcamprisma.user.findFirst({
+        where: { email, id: { not: Number(user_id) } },
+      });
+      if (emailExists) {
+        return res.status(409).json({ status: "error", message: "Email already exists" });
+      }
+      updateData.email = email;
+    }
+
+    if (mobile && mobile !== existingUser.mobile) {
+      const mobileExists = await gcamprisma.user.findFirst({
+        where: { mobile, id: { not: Number(user_id) } },
+      });
+      if (mobileExists) {
+        return res.status(409).json({ status: "error", message: "Mobile already exists" });
+      }
+      updateData.mobile = mobile;
+    }
+
+    if (role && role !== existingUser.role) {
+      if (!globalroles.includes(role)) {
+        return res.status(400).json({
+          status: "error",
+          message: "Invalid global role",
+          allowedroles: globalroles,
+          receivedrole: role,
+        });
+      }
+      updateData.role = role;
+    }
+
+    if (password) {
+      const hashedpass = await hashPassword(password);
+      if (hashedpass !== existingUser.password) {
+        updateData.password = hashedpass;
+      }
+    }
+
+    // ---------- ORG + DEVICE UPDATES ----------
+    let orgUpdatesNeeded = false;
+    let orgDiffOps = []; // holds insert/update/delete instructions
+
+    if (role === "USER" && organizations) {
+      // Map current orgs/devices
+      const currentOrgs = existingUser.organization.map(o => ({
+        orgId: o.organization_id,
+        role: o.role,
+      }));
+      const currentDevices = existingUser.device_access.map(d => ({
+        deviceId: d.device_id,
+        orgId: existingUser.organization.find(o => o.user_id === d.user_id)?.organization_id,
+      }));
+
+      const incomingOrgs = organizations.map(o => ({
+        orgId: o.id,
+        role: o.role,
+        devices: o.devices || [],
+      }));
+
+      // Build sets for comparison
+      const currentOrgIds = currentOrgs.map(o => o.orgId);
+      const incomingOrgIds = incomingOrgs.map(o => o.orgId);
+
+      // Orgs to remove
+      for (const orgId of currentOrgIds) {
+        if (!incomingOrgIds.includes(orgId)) {
+          orgUpdatesNeeded = true;
+          orgDiffOps.push({ action: "removeOrg", orgId });
+        }
+      }
+
+      // Orgs to add or update
+      for (const org of incomingOrgs) {
+        const existing = currentOrgs.find(o => o.orgId === org.orgId);
+        if (!existing) {
+          // New org → add
+          orgUpdatesNeeded = true;
+          orgDiffOps.push({ action: "addOrg", org });
+        } else if (existing.role !== org.role) {
+          // Role changed → update
+          orgUpdatesNeeded = true;
+          orgDiffOps.push({ action: "updateOrgRole", org });
+        }
+
+        // Device diff (only if org.role === USER)
+        if (org.role === "USER") {
+          const existingDevs = currentDevices
+            .filter(d => d.orgId === org.orgId)
+            .map(d => d.deviceId);
+          const incomingDevs = org.devices;
+
+          // Devices to remove
+          for (const devId of existingDevs) {
+            if (!incomingDevs.includes(devId)) {
+              orgUpdatesNeeded = true;
+              orgDiffOps.push({ action: "removeDevice", orgId: org.orgId, deviceId: devId });
+            }
+          }
+
+          // Devices to add
+          for (const devId of incomingDevs) {
+            if (!existingDevs.includes(devId)) {
+              orgUpdatesNeeded = true;
+              orgDiffOps.push({ action: "addDevice", orgId: org.orgId, deviceId: devId });
+            }
+          }
+        }
+      }
+    }
+
+    // ---------- NOTHING CHANGED ----------
+    if (Object.keys(updateData).length === 0 && !orgUpdatesNeeded) {
+      return res.status(200).json({
+        status: "success",
+        message: "No changes detected",
+      });
+    }
+
+    // ---------- TRANSACTION ----------
+    const result = await gcamprisma.$transaction(async (tx) => {
+      let updatedUser = existingUser;
+
+      // Basic update
+      if (Object.keys(updateData).length > 0) {
+        updatedUser = await tx.user.update({
+          where: { id: Number(user_id) },
+          data: updateData,
+        });
+      }
+
+      // Apply org/device diffs
+      for (const op of orgDiffOps) {
+        switch (op.action) {
+          case "removeOrg":
+            await tx.userOrganization.deleteMany({
+              where: { user_id: updatedUser.id, organization_id: op.orgId },
+            });
+            await tx.userDevice.deleteMany({
+              where: { user_id: updatedUser.id },
+              // optional: filter by org's devices
+            });
+            break;
+
+          case "addOrg":
+            await tx.userOrganization.create({
+              data: {
+                user_id: updatedUser.id,
+                organization_id: op.org.orgId,
+                role: op.org.role,
+              },
+            });
+            if (op.org.role === "USER") {
+              for (const deviceId of op.org.devices) {
+                await tx.userDevice.create({
+                  data: { user_id: updatedUser.id, device_id: deviceId },
+                });
+              }
+            }
+            break;
+
+          case "updateOrgRole":
+            await tx.userOrganization.updateMany({
+              where: { user_id: updatedUser.id, organization_id: op.org.orgId },
+              data: { role: op.org.role },
+            });
+            break;
+
+          case "removeDevice":
+            await tx.userDevice.deleteMany({
+              where: { user_id: updatedUser.id, device_id: op.deviceId },
+            });
+            break;
+
+          case "addDevice":
+            await tx.userDevice.create({
+              data: { user_id: updatedUser.id, device_id: op.deviceId },
+            });
+            break;
+        }
+      }
+
+      return updatedUser;
+    });
+
+    return res.status(200).json({
+      status: "success",
+      message: "User updated successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ status: "error", message: "Internal Server Error", error: error.message });
+  }
+};
 
 
+
+const deleteUser = async (req, res) => {
+  const { user_id } = req.params;
+
+  try {
+    if (!user_id) {
+      return res.status(400).json({
+        status: "error",
+        message: "Bad request, user_id is required",
+      });
+    }
+
+    const existingUser = await gcamprisma.user.findUnique({
+      where: { id: Number(user_id) },
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({
+        status: "error",
+        message: "User not found",
+      });
+    }
+
+    // Transaction to delete user + related links
+    await gcamprisma.$transaction(async (tx) => {
+      // delete org links
+      await tx.userOrganization.deleteMany({
+        where: { user_id: Number(user_id) },
+      });
+
+      // delete device links
+      await tx.userDevice.deleteMany({
+        where: { user_id: Number(user_id) },
+      });
+
+      // finally delete user
+      await tx.user.delete({
+        where: { id: Number(user_id) },
+      });
+    });
+
+    return res.status(200).json({
+      status: "success",
+      message: "User deleted successfully",
+    });
+  } catch (error) {
+    console.error("❌ Error deleting user:", error);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
 
 
 module.exports = {
     createuser,
-    getuserdetail,
-    getallusers
-
+    getAllUsers,
+    updateUser,
+    deleteUser
 }
