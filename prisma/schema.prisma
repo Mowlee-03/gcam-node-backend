@@ -90,7 +90,7 @@ model Device {
   name            String?
   location        Json?
   site_id         Int?
-  organization_id Int
+  organization_id Int?
   max_count       Int?
   created_at      DateTime            @default(now())
 
@@ -99,7 +99,7 @@ model Device {
   personlog       PersonLog[]
   latestlog       LatestLog?
   site            Site?                @relation(fields: [site_id],references: [id],onDelete: SetNull,onUpdate: Cascade)
-  organization    Organization        @relation(fields: [organization_id],references: [id])
+  organization    Organization?          @relation(fields: [organization_id],references: [id],onDelete: SetNull,onUpdate: Cascade)
 }
 
 model UserDevice {
