@@ -305,6 +305,11 @@ const getallusers = async (req,res) => {
                 device_access:true
             }
         })
+
+        return res.status(200).json({
+          status:"success",
+          data:usersdata
+        })
     } catch (error) {
         console.error(error);
         return res.status(500).json({
@@ -321,5 +326,6 @@ const getallusers = async (req,res) => {
 module.exports = {
     createuser,
     getuserdetail,
+    getallusers
 
 }

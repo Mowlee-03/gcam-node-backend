@@ -43,12 +43,14 @@ const createOrganization = async (req,res) => {
 
 const getAllOrganization = async (req,res) => {
     try {
-        const orgDatas = await gcamprisma.organization.findMany({
-            include:{
-                sites:true,
-                devices:true
+        const orgDatas = await gcamprisma.organization.findMany(
+            {
+                include:{
+                    sites:true,
+                    devices:true
+                }
             }
-        })
+    )
 
         return res.status(200).json({
             status:"success",
@@ -102,7 +104,7 @@ const updateOrganization = async (req,res) => {
 
         }else{
             return res.status(200).json({
-                status:"success",
+                status:"info",
                 message:"No changes made"
             })
         }
