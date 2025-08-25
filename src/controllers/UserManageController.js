@@ -1,5 +1,5 @@
-const {PrismaClient,GlobalRole,OrgRole}=require("../../generated/prisma")
-const { hashPassword } = require("../../utils/password")
+const {PrismaClient,GlobalRole,OrgRole}=require("../generated/prisma")
+const { hashPassword } = require("../utils/password")
 const gcamprisma = new PrismaClient()
 const globalroles = Object.values(GlobalRole)
 const orgroles = Object.values(OrgRole)
@@ -293,7 +293,6 @@ const getAllUsers = async (req, res) => {
     });
   }
 };
-
 
 
 
