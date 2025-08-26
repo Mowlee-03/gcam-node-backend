@@ -301,7 +301,6 @@ const updateUser = async (req, res) => {
   const {
     username,
     fullname,
-    password,
     mobile,
     role,
     organizations, // optional [{ id, role, devices }]
@@ -360,12 +359,7 @@ const updateUser = async (req, res) => {
       updateData.role = role;
     }
 
-    if (password) {
-      const hashedpass = await hashPassword(password);
-      if (hashedpass !== existingUser.password) {
-        updateData.password = hashedpass;
-      }
-    }
+
 
     // ---------- ORG + DEVICE UPDATES ----------
     let orgUpdatesNeeded = false;
@@ -442,7 +436,7 @@ const updateUser = async (req, res) => {
     // ---------- NOTHING CHANGED ----------
     if (Object.keys(updateData).length === 0 && !orgUpdatesNeeded) {
       return res.status(200).json({
-        status: "success",
+        status: "info",
         message: "No changes detected",
       });
     }

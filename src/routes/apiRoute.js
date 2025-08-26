@@ -8,9 +8,9 @@ const DeviceRoute = require("../routes/api/DeviceRoute")
 const listRoute = require("../routes/api/listRoute")
 
 
-router.use("/user",userRoute)
-router.use("/organization",orgRoute)
-router.use("/site",SiteRoute)
-router.use("/device",DeviceRoute)
-router.use("/list",listRoute)
+router.use("/user",authMiddleware,userRoute)
+router.use("/organization",authMiddleware,orgRoute)
+router.use("/site",authMiddleware,SiteRoute)
+router.use("/device",authMiddleware,DeviceRoute)
+router.use("/list",authMiddleware,listRoute)
 module.exports = router;

@@ -191,7 +191,7 @@ const updateSite = async (req, res) => {
       });
     } else {
       return res.status(200).json({
-        status: "success",
+        status: "info",
         message: "No changes made"
       });
     }

@@ -20,12 +20,12 @@ const verifyToken = (token) => {
 };
 
 
-const setAuthTokenCookie = (res, token) => {   
-      res.cookie('authToken', token, {
+const setAuthTokenCookie = (res, cookiename,token) => {   
+      res.cookie(cookiename, token, {
           httpOnly: true, // Prevent access from JavaScript (mitigates XSS attacks)
           secure: process.env.NODE_ENV==="production",
-          sameSite: "Strict", // Protect against CSRF
-          maxAge: 60 * 60 * 1000, 
+          sameSite: "None", // Protect against CSRF
+          maxAge: 24 * 60 * 60 * 1000, 
       });
     };
 

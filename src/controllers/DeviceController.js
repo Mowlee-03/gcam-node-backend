@@ -307,7 +307,7 @@ const deviceUpdate = async (req, res) => {
     // If no changes, return early
     if (Object.keys(updateData).length === 0) {
       return res.status(200).json({
-        status: "success",
+        status: "info",
         message: "No changes detected, device not updated",
         data: device
       });

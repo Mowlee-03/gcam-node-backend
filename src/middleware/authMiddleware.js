@@ -4,13 +4,17 @@ const prisma = new PrismaClient();
 
 const authMiddleware = async (req, res, next) => {
   try {
-    const token = req.cookies.authToken;
+    const token = req.cookies.gcam_auth_token; // <-- match the cookie name
 
     if (!token) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
     const decodedUser = verifyToken(token);
+
+    if (decodedUser.error) {
+      return res.status(401).json({ message: decodedUser.error });
+    }
 
     if (!decodedUser || !decodedUser.id) {
       return res.status(401).json({ message: "Invalid token." });
@@ -21,16 +25,16 @@ const authMiddleware = async (req, res, next) => {
     });
 
     if (!foundedUser) {
-      return res.status(404).json({ message: "User not found." });
+      return res.status(404).json({ message: "User not found , Auth denied" });
     }
 
     req.user = decodedUser;
-
     next();
   } catch (error) {
     console.log(error);
     res.status(401).json({ message: "Unauthorized request." });
   }
 };
+
 
 module.exports = authMiddleware;
