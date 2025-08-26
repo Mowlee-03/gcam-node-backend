@@ -9,7 +9,7 @@ var router = express.Router()
 
 
 router.post("/register",deviceRegister)
-router.get("/viewall",getdevices)
+router.post("/viewall",getdevices)
 router.put("/update/:device_id",deviceUpdate)
 router.delete("/delete/:device_id",deviceDelete)
 

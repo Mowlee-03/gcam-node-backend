@@ -3,7 +3,8 @@ const {
     createsite, 
     viewOnesiteDetaily, 
     allSiteDetails, 
-    deleteSite 
+    deleteSite, 
+    updateSite
 } = require("../../controllers/SiteController")
 var router = express.Router()
 

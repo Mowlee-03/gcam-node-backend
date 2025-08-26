@@ -155,6 +155,12 @@ const getdevices = async (req, res) => {
 
     let devices = [];
 
+    if (!role) {
+      return res.status(400).json({
+        status:"error",
+        message:"Bad request"
+      })
+    }
     if (role === "SUPERADMIN") {
       // Fetch all devices
       devices = await gcamprisma.device.findMany({
