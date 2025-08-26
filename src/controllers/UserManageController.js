@@ -9,7 +9,7 @@ const orgroles = Object.values(OrgRole)
 const createuser = async (req, res) => {
   const {
     username,
-    email,
+    fullname,
     password,
     mobile,
     role,
@@ -18,19 +18,19 @@ const createuser = async (req, res) => {
 
   try {
     // Basic required fields
-    if (!username || !email || !password || !mobile || !role) {
+    if (!username || !fullname || !password || !mobile || !role) {
       return res.status(400).json({
         status: "error",
         message: "Bad request , missing required fields",
       });
     }
 
-    // Unique email check
-    const userexistwithemail = await gcamprisma.user.findUnique({ where: { email } });
-    if (userexistwithemail) {
+    // Unique username check
+    const userexistwithUsername = await gcamprisma.user.findUnique({ where: { username } });
+    if (userexistwithUsername) {
       return res.status(409).json({
         status: "error",
-        message: "User with this 'email' already exists",
+        message: "User with this 'username' already exists",
       });
     }
 
@@ -147,7 +147,7 @@ const createuser = async (req, res) => {
     const result = await gcamprisma.$transaction(async (tx) => {
       // Create user
       const newUser = await tx.user.create({
-        data: { username, email, password: hashedpass, mobile, role },
+        data: { username, fullname, password: hashedpass, mobile, role },
       });
 
       // If role = USER, create org + device relations
@@ -228,7 +228,7 @@ const getAllUsers = async (req, res) => {
           return {
             id: user.id,
             username: user.username,
-            email: user.email,
+            fullname: user.fullname,
             mobile: user.mobile,
             role: user.role,
             organizations: "ALL",
@@ -272,7 +272,7 @@ const getAllUsers = async (req, res) => {
         return {
           id: user.id,
           username: user.username,
-          email: user.email,
+          fullname: user.fullname,
           mobile: user.mobile,
           role: user.role,
           organizations: orgAccess,
@@ -300,7 +300,7 @@ const updateUser = async (req, res) => {
   const { user_id } = req.params;
   const {
     username,
-    email,
+    fullname,
     password,
     mobile,
     role,
@@ -324,18 +324,18 @@ const updateUser = async (req, res) => {
     // ---------- BASIC FIELD CHANGES ----------
     let updateData = {};
 
-    if (username && username !== existingUser.username) {
-      updateData.username = username;
+    if (fullname && fullname !== existingUser.fullname) {
+      updateData.fullname = fullname;
     }
 
-    if (email && email !== existingUser.email) {
-      const emailExists = await gcamprisma.user.findFirst({
-        where: { email, id: { not: Number(user_id) } },
+    if (username && username !== existingUser.username) {
+      const usernameExists = await gcamprisma.user.findFirst({
+        where: { username, id: { not: Number(user_id) } },
       });
-      if (emailExists) {
-        return res.status(409).json({ status: "error", message: "Email already exists" });
+      if (usernameExists) {
+        return res.status(409).json({ status: "error", message: "Username already exists" });
       }
-      updateData.email = email;
+      updateData.username = username;
     }
 
     if (mobile && mobile !== existingUser.mobile) {

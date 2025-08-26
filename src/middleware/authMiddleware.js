@@ -1,5 +1,5 @@
 const { verifyToken } = require("../utils/token");
-const { PrismaClient } = require("../generated/prisma");
+const {PrismaClient}=require("../generated/prisma")
 const prisma = new PrismaClient();
 
 const authMiddleware = async (req, res, next) => {
@@ -7,7 +7,7 @@ const authMiddleware = async (req, res, next) => {
     const token = req.cookies.authToken;
 
     if (!token) {
-      return res.status(401).json({ message: "No token provided." });
+      return res.status(401).json({ message: "Unauthorized" });
     }
 
     const decodedUser = verifyToken(token);
