@@ -63,7 +63,7 @@ const getSitesForOneOrganization = async (req,res) => {
 
 const getRegisteredDeviceList = async (req,res) => {
     try {
-        const {org_ids} = req.params
+        const {org_ids} = req.body
 
         if (!org_ids || !Array.isArray(org_ids || org_ids.length ===0)) {
             return res.status(400).json({
@@ -102,6 +102,11 @@ const getnonRegisteredDevicelist = async (req,res) => {
             where : {
                 is_registered:false
             }
+        })
+
+        return res.status(200).json({
+            status:"success",
+            data:data
         })
     } catch (error) {
         console.log(error)
