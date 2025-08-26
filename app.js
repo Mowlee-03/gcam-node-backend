@@ -6,7 +6,8 @@ var logger = require('morgan');
 
 var indexRouter = require('./src/routes/index');
 var apiRouter = require('./src/routes/apiRoute');
-var publicRouter = require("./src/routes/publicRoute")
+var publicRouter = require("./src/routes/publicRoute");
+const authMiddleware = require('./src/middleware/authMiddleware');
 var app = express();
 
 // view engine setup
@@ -21,8 +22,8 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
-app.use("/gcam",publicRouter)
-app.use('/api', apiRouter);
+app.use("/gcam/common",publicRouter)
+app.use('/api', authMiddleware,apiRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
