@@ -363,10 +363,213 @@ const deviceDelete = async (req,res) => {
         });
     }
 }
+
+
+const addDeviceAccess = async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    const { devices } = req.body; // [1, 2, 3]
+
+    if (!user_id || !Array.isArray(devices) || devices.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "Bad request. user_id and devices[] are required",
+      });
+    }
+
+    // 🔹 Step 1: Check user exists
+    const userExist = await gcamprisma.user.findUnique({
+      where: { id: Number(user_id) },
+      include: { organization: true }, // user’s org roles
+    });
+
+    if (!userExist) {
+      return res.status(404).json({
+        status: "error",
+        message: "User not found",
+      });
+    }
+
+    // 🔹 Step 2: Fetch devices
+    const deviceList = await gcamprisma.device.findMany({
+      where: { id: { in: devices.map(Number) } },
+      select: { id: true, organization_id: true , name:true ,imei:true },
+      include:{organization:{select:{name:true}}}
+    });
+
+    if (deviceList.length !== devices.length) {
+      return res.status(400).json({
+        status: "error",
+        message: "Some device IDs are invalid",
+      });
+    }
+
+    // 🔹 Step 3: Validate each device
+    let assignableDevices = [];
+    for (const d of deviceList) {
+      const orgMembership = userExist.organization.find(
+        (org) => org.organization_id === d.organization_id
+      );
+
+      if (!orgMembership) {
+        return res.status(403).json({
+          status: "error",
+          message: `User does not belong to organization ${d.organization.name} (device ${d.name || d.imei})`,
+        });
+      }
+
+      if (orgMembership.role === "ADMIN") {
+        // Admin → no device assignment required
+        continue;
+      }
+
+      if (orgMembership.role === "USER") {
+        assignableDevices.push(d.id);
+      } else {
+        return res.status(403).json({
+          status: "error",
+          message: `Role ${orgMembership.role} is not allowed for device assignment (device ${d.name|| d.imei})`,
+        });
+      }
+    }
+
+    // 🔹 Step 4: Update device assignments (for USER role only)
+    if (assignableDevices.length > 0) {
+      await gcamprisma.userDevice.deleteMany({
+        where: { user_id: Number(user_id) },
+      });
+
+      await gcamprisma.userDevice.createMany({
+        data: assignableDevices.map((deviceId) => ({
+          user_id: Number(user_id),
+          device_id: deviceId,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    return res.status(200).json({
+      status: "success",
+      message: "Device access updated successfully",
+      assigned_devices: assignableDevices,
+      skipped_as_admin: deviceList
+        .filter((d) => !assignableDevices.includes(d.id))
+        .map((d) => d.id),
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+
+const removeDeviceAccess = async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    const { devices } = req.body; // [1, 2, 3]
+
+    if (!user_id || !Array.isArray(devices) || devices.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "Bad request. user_id and devices[] are required",
+      });
+    }
+
+    // 🔹 Step 1: Check user exists
+    const userExist = await gcamprisma.user.findUnique({
+      where: { id: Number(user_id) },
+      include: { organization: true },
+    });
+
+    if (!userExist) {
+      return res.status(404).json({
+        status: "error",
+        message: "User not found",
+      });
+    }
+
+    // 🔹 Step 2: Fetch devices
+    const deviceList = await gcamprisma.device.findMany({
+      where: { id: { in: devices.map(Number) } },
+      select: { id: true, organization_id: true ,name:true,imei:true },
+      include:{organization:{select:{name:true}}}
+    });
+
+    if (deviceList.length !== devices.length) {
+      return res.status(400).json({
+        status: "error",
+        message: "Some device IDs are invalid",
+      });
+    }
+
+    // 🔹 Step 3: Validate devices and prepare deletions
+    let removableDevices = [];
+    for (const d of deviceList) {
+      const orgMembership = userExist.organization.find(
+        (org) => org.organization_id === d.organization_id
+      );
+
+      if (!orgMembership) {
+        return res.status(403).json({
+          status: "error",
+          message: `User does not belong to organization ${d.organization.name} (device ${d.name || d.imei})`,
+        });
+      }
+
+      if (orgMembership.role === "ADMIN") {
+        return res.status(403).json({
+          status: "error",
+          message: `User have ADMIN role already has full access. Cannot remove device ${d.name|| d.imei} individually.`,
+        });
+      }
+
+      if (orgMembership.role === "USER") {
+        removableDevices.push(d.id);
+      } else {
+        return res.status(403).json({
+          status: "error",
+          message: `Role ${orgMembership.role} is not allowed for device removal (device ${d.id})`,
+        });
+      }
+    }
+
+    // 🔹 Step 4: Remove device access
+    if (removableDevices.length > 0) {
+      await gcamprisma.userDevice.deleteMany({
+        where: {
+          user_id: Number(user_id),
+          device_id: { in: removableDevices },
+        },
+      });
+    }
+
+    return res.status(200).json({
+      status: "success",
+      message: "Device access removed successfully",
+      removed_devices: removableDevices,
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
     createDevice,
     deviceRegister,
     getdevices,
     deviceUpdate,
-    deviceDelete
+    deviceDelete,
+    addDeviceAccess,
+    removeDeviceAccess
 }

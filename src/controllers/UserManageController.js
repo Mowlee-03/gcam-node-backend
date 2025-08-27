@@ -394,7 +394,6 @@ const updateUser = async (req, res) => {
 
 
 
-
 const deleteUser = async (req, res) => {
   const { user_id } = req.params;
 

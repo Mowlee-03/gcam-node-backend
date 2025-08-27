@@ -258,7 +258,7 @@ const addOrgAccess = async (req, res) => {
 const removeOrgAccess = async (req, res) => {
   try {
     const { user_id } = req.params;
-    const { organization } = req.body; // [{id:1}, {id:2}]
+    const { organization } = req.body; // [{id:1,name:""}, {id:2,name:""}]
 
     if (!user_id) {
       return res.status(400).json({
@@ -283,9 +283,6 @@ const removeOrgAccess = async (req, res) => {
             user_id: Number(user_id),
             organization_id: org.id,
           },
-        },
-        include: {
-          organization: { select: { name: true } },
         },
       });
 
@@ -323,7 +320,7 @@ const removeOrgAccess = async (req, res) => {
 
         results.push({
           organization_id: org.id,
-          orgname: assigned.organization.name,
+          orgname: org.name,
           role: assigned.role,
           status: "removed",
           devices_removed: deviceCleanupCount,
@@ -351,5 +348,7 @@ module.exports = {
     createOrganization,
     getAllOrganization,
     updateOrganization,
-    deleteOrganization
+    deleteOrganization,
+    addOrgAccess,
+    removeOrgAccess
 }
