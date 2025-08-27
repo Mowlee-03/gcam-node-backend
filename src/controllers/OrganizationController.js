@@ -148,6 +148,205 @@ const deleteOrganization = async (req,res) => {
 }
 
 
+
+const addOrgAccess = async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    const { organization } = req.body; // [{id:1,role:"ADMIN"},{id:2,role:"USER"}]
+
+    if (!user_id) {
+      return res.status(400).json({
+        status: "error",
+        message: "Bad request, user_id required",
+      });
+    }
+
+    const existData = await gcamprisma.user.findUnique({
+      where: { id: Number(user_id) },
+      include: {
+        organization: {
+          select: {
+            organization_id: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!existData) {
+      return res.status(404).json({
+        status: "error",
+        message: "User not found",
+      });
+    }
+
+    if (existData.role !== "USER") {
+      return res.status(403).json({
+        status: "error",
+        message: "Organization assigning only for Clients",
+      });
+    }
+
+    if (!organization || !Array.isArray(organization) || organization.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "Bad request, at least one organization entry is required",
+      });
+    }
+
+    const results = [];
+
+    // ✅ Loop through each org request
+    for (const org of organization) {
+      const alreadyAssigned = await gcamprisma.userOrganization.findUnique({
+        where: {
+          user_id_organization_id: {
+            user_id: Number(user_id),
+            organization_id: org.id,
+          },
+        },
+        include: {
+          organization: { select: { name: true } }, // 👈 fetch org name
+        },
+      });
+
+      if (alreadyAssigned) {
+        results.push({
+          organization_id: org.id,
+          orgname: alreadyAssigned.organization.name, // 👈 org name added
+          role: alreadyAssigned.role,
+          status: "skipped - already assigned",
+        });
+      } else {
+        const newOrg = await gcamprisma.userOrganization.create({
+          data: {
+            user_id: Number(user_id),
+            organization_id: org.id,
+            role: org.role || "USER",
+          },
+          include: {
+            organization: { select: { name: true } }, // 👈 fetch org name
+          },
+        });
+
+        results.push({
+          organization_id: newOrg.organization_id,
+          orgname: newOrg.organization.name, // 👈 org name added
+          role: newOrg.role,
+          status: "created",
+        });
+      }
+    }
+
+    return res.status(200).json({
+      status: "success",
+      message: "Organization assignment process completed",
+      data: results,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+
+
+const removeOrgAccess = async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    const { organization } = req.body; // [{id:1}, {id:2}]
+
+    if (!user_id) {
+      return res.status(400).json({
+        status: "error",
+        message: "Bad request, user_id required",
+      });
+    }
+
+    if (!organization || !Array.isArray(organization) || organization.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "Bad request, at least one organization entry is required",
+      });
+    }
+
+    const results = [];
+
+    for (const org of organization) {
+      const assigned = await gcamprisma.userOrganization.findUnique({
+        where: {
+          user_id_organization_id: {
+            user_id: Number(user_id),
+            organization_id: org.id,
+          },
+        },
+        include: {
+          organization: { select: { name: true } },
+        },
+      });
+
+      if (!assigned) {
+        results.push({
+          organization_id: org.id,
+          orgname: null,
+          status: "skipped - not assigned",
+        });
+      } else {
+        // ✅ Remove UserOrganization
+        await gcamprisma.userOrganization.delete({
+          where: {
+            user_id_organization_id: {
+              user_id: Number(user_id),
+              organization_id: org.id,
+            },
+          },
+        });
+
+        let deviceCleanupCount = 0;
+
+        // ✅ If role was USER → remove all UserDevice under that organization
+        if (assigned.role === "USER") {
+          const deleted = await gcamprisma.userDevice.deleteMany({
+            where: {
+              user_id: Number(user_id),
+              device: {
+                organization_id: org.id, // 👈 no need to query devices first
+              },
+            },
+          });
+          deviceCleanupCount = deleted.count;
+        }
+
+        results.push({
+          organization_id: org.id,
+          orgname: assigned.organization.name,
+          role: assigned.role,
+          status: "removed",
+          devices_removed: deviceCleanupCount,
+        });
+      }
+    }
+
+    return res.status(200).json({
+      status: "success",
+      message: "Organization access removal process completed",
+      data: results,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+
 module.exports = {
     createOrganization,
     getAllOrganization,

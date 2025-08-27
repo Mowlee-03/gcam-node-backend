@@ -88,10 +88,10 @@ const createuser = async (req, res) => {
       for (const org of organizations) {
         const orgData = orgsExist.find(o => o.id === org.id);
 
-        if (!org.role) {
+        if (!org.role || !org.id) {
           return res.status(400).json({
             status: "error",
-            message: `org_role is required for organization '${orgData?.name || org.id}'`,
+            message: `Bad request for '${orgData?.name || org.id}'`,
           });
         }
 
@@ -100,7 +100,7 @@ const createuser = async (req, res) => {
             status: "error",
             message: "Invalid org role",
             allowedroles: orgroles,
-            receivedrole: `Received role ${org.role} for organization '${orgData?.name || org.id}'`,
+            receivedrole: `Received role ${org.role} for '${orgData?.name || org.id}'`,
           });
         }
 
@@ -108,7 +108,7 @@ const createuser = async (req, res) => {
           if (!org.devices || org.devices.length === 0) {
             return res.status(400).json({
               status: "error",
-              message: `Devices are required for organization '${orgData?.name || org.id}' when org_role is USER`,
+              message: `Devices are required for '${orgData?.name || org.id}' when org_role is USER`,
             });
           }
 
@@ -123,7 +123,7 @@ const createuser = async (req, res) => {
           if (missingDevs.length > 0) {
             return res.status(400).json({
               status: "error",
-              message: `Some devices not found for organization '${orgData?.name || org.id}'`,
+              message: `Some devices not found for '${orgData?.name || org.id}'`,
               missingDevices: missingDevs,
             });
           }
@@ -133,7 +133,7 @@ const createuser = async (req, res) => {
           if (invalidDevs.length > 0) {
             return res.status(400).json({
               status: "error",
-              message: `Some devices do not belong to organization '${orgData?.name || org.id}'`,
+              message: `Some devices do not belong to '${orgData?.name || org.id}'`,
               invalidDevices: invalidDevs.map(d => d.id),
             });
           }
@@ -295,57 +295,54 @@ const getAllUsers = async (req, res) => {
 };
 
 
-
 const updateUser = async (req, res) => {
   const { user_id } = req.params;
-  const {
-    username,
-    fullname,
-    mobile,
-    role,
-    organizations, // optional [{ id, role, devices }]
-  } = req.body;
+  const { username, fullname, mobile, role, } = req.body;
 
   try {
+    if (!user_id) {
+      return res.status(400).json({
+        status: "error",
+        message: "Bad request",
+      });
+    }
+
+    // ✅ Check for extra fields
+    const allowedFields = ["username", "fullname", "mobile", "role"];
+    const extraFields = Object.keys(req.body).filter(
+      (key) => !allowedFields.includes(key)
+    );
+
+    if (extraFields.length > 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "Invalid fields in request body",
+        invalidFields: extraFields,
+        allowedFields,
+      });
+    }
+
     // Fetch existing user with orgs/devices
     const existingUser = await gcamprisma.user.findUnique({
       where: { id: Number(user_id) },
       include: {
-        organization: true, // [{ id, user_id, organization_id, role }]
-        device_access: true, // [{ id, user_id, device_id }]
+        organization: true,
+        device_access: true,
       },
     });
 
     if (!existingUser) {
-      return res.status(404).json({ status: "error", message: "User not found" });
-    }
-
-    // ---------- BASIC FIELD CHANGES ----------
-    let updateData = {};
-
-    if (fullname && fullname !== existingUser.fullname) {
-      updateData.fullname = fullname;
-    }
-
-    if (username && username !== existingUser.username) {
-      const usernameExists = await gcamprisma.user.findFirst({
-        where: { username, id: { not: Number(user_id) } },
+      return res.status(404).json({
+        status: "error",
+        message: "User not found",
       });
-      if (usernameExists) {
-        return res.status(409).json({ status: "error", message: "Username already exists" });
-      }
-      updateData.username = username;
     }
 
-    if (mobile && mobile !== existingUser.mobile) {
-      const mobileExists = await gcamprisma.user.findFirst({
-        where: { mobile, id: { not: Number(user_id) } },
-      });
-      if (mobileExists) {
-        return res.status(409).json({ status: "error", message: "Mobile already exists" });
-      }
-      updateData.mobile = mobile;
-    }
+    const updateData = {};
+
+    if (username) updateData.username = username;
+    if (fullname) updateData.fullname = fullname;
+    if (mobile) updateData.mobile = mobile;
 
     if (role && role !== existingUser.role) {
       if (!globalroles.includes(role)) {
@@ -357,154 +354,27 @@ const updateUser = async (req, res) => {
         });
       }
       updateData.role = role;
-    }
 
-
-
-    // ---------- ORG + DEVICE UPDATES ----------
-    let orgUpdatesNeeded = false;
-    let orgDiffOps = []; // holds insert/update/delete instructions
-
-    if (role === "USER" && organizations) {
-      // Map current orgs/devices
-      const currentOrgs = existingUser.organization.map(o => ({
-        orgId: o.organization_id,
-        role: o.role,
-      }));
-      const currentDevices = existingUser.device_access.map(d => ({
-        deviceId: d.device_id,
-        orgId: existingUser.organization.find(o => o.user_id === d.user_id)?.organization_id,
-      }));
-
-      const incomingOrgs = organizations.map(o => ({
-        orgId: o.id,
-        role: o.role,
-        devices: o.devices || [],
-      }));
-
-      // Build sets for comparison
-      const currentOrgIds = currentOrgs.map(o => o.orgId);
-      const incomingOrgIds = incomingOrgs.map(o => o.orgId);
-
-      // Orgs to remove
-      for (const orgId of currentOrgIds) {
-        if (!incomingOrgIds.includes(orgId)) {
-          orgUpdatesNeeded = true;
-          orgDiffOps.push({ action: "removeOrg", orgId });
-        }
-      }
-
-      // Orgs to add or update
-      for (const org of incomingOrgs) {
-        const existing = currentOrgs.find(o => o.orgId === org.orgId);
-        if (!existing) {
-          // New org → add
-          orgUpdatesNeeded = true;
-          orgDiffOps.push({ action: "addOrg", org });
-        } else if (existing.role !== org.role) {
-          // Role changed → update
-          orgUpdatesNeeded = true;
-          orgDiffOps.push({ action: "updateOrgRole", org });
-        }
-
-        // Device diff (only if org.role === USER)
-        if (org.role === "USER") {
-          const existingDevs = currentDevices
-            .filter(d => d.orgId === org.orgId)
-            .map(d => d.deviceId);
-          const incomingDevs = org.devices;
-
-          // Devices to remove
-          for (const devId of existingDevs) {
-            if (!incomingDevs.includes(devId)) {
-              orgUpdatesNeeded = true;
-              orgDiffOps.push({ action: "removeDevice", orgId: org.orgId, deviceId: devId });
-            }
-          }
-
-          // Devices to add
-          for (const devId of incomingDevs) {
-            if (!existingDevs.includes(devId)) {
-              orgUpdatesNeeded = true;
-              orgDiffOps.push({ action: "addDevice", orgId: org.orgId, deviceId: devId });
-            }
-          }
-        }
+      if (existingUser.role === "USER" && role === "SUPERADMIN") {
+        await gcamprisma.userOrganization.deleteMany({
+          where: { user_id: Number(user_id) },
+        });
+        await gcamprisma.userDevice.deleteMany({
+          where: { user_id: Number(user_id) },
+        });
       }
     }
 
-    // ---------- NOTHING CHANGED ----------
-    if (Object.keys(updateData).length === 0 && !orgUpdatesNeeded) {
+    if (Object.keys(updateData).length === 0) {
       return res.status(200).json({
         status: "info",
         message: "No changes detected",
       });
     }
 
-    // ---------- TRANSACTION ----------
-    const result = await gcamprisma.$transaction(async (tx) => {
-      let updatedUser = existingUser;
-
-      // Basic update
-      if (Object.keys(updateData).length > 0) {
-        updatedUser = await tx.user.update({
-          where: { id: Number(user_id) },
-          data: updateData,
-        });
-      }
-
-      // Apply org/device diffs
-      for (const op of orgDiffOps) {
-        switch (op.action) {
-          case "removeOrg":
-            await tx.userOrganization.deleteMany({
-              where: { user_id: updatedUser.id, organization_id: op.orgId },
-            });
-            await tx.userDevice.deleteMany({
-              where: { user_id: updatedUser.id },
-              // optional: filter by org's devices
-            });
-            break;
-
-          case "addOrg":
-            await tx.userOrganization.create({
-              data: {
-                user_id: updatedUser.id,
-                organization_id: op.org.orgId,
-                role: op.org.role,
-              },
-            });
-            if (op.org.role === "USER") {
-              for (const deviceId of op.org.devices) {
-                await tx.userDevice.create({
-                  data: { user_id: updatedUser.id, device_id: deviceId },
-                });
-              }
-            }
-            break;
-
-          case "updateOrgRole":
-            await tx.userOrganization.updateMany({
-              where: { user_id: updatedUser.id, organization_id: op.org.orgId },
-              data: { role: op.org.role },
-            });
-            break;
-
-          case "removeDevice":
-            await tx.userDevice.deleteMany({
-              where: { user_id: updatedUser.id, device_id: op.deviceId },
-            });
-            break;
-
-          case "addDevice":
-            await tx.userDevice.create({
-              data: { user_id: updatedUser.id, device_id: op.deviceId },
-            });
-            break;
-        }
-      }
-
-      return updatedUser;
+    const result = await gcamprisma.user.update({
+      where: { id: Number(user_id) },
+      data: updateData,
     });
 
     return res.status(200).json({
@@ -514,9 +384,14 @@ const updateUser = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ status: "error", message: "Internal Server Error", error: error.message });
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 };
+
 
 
 
