@@ -73,7 +73,7 @@ const getRegisteredDeviceList = async (req,res) => {
         }
 
         const devices = await gcamprisma.device.findMany({
-            where:{organization_id:{in:Number(org_id)}},
+            where:{organization_id:{in:Number(org_ids)}},
             select : { 
                 id      :   true,
                 imei    :   true,
@@ -117,6 +117,10 @@ const getnonRegisteredDevicelist = async (req,res) => {
         })
     }
 }
+
+
+
+
 module.exports = {
     getOrganizationList,
     getSitesForOneOrganization,

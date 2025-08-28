@@ -1,6 +1,6 @@
-const {PrismaClient}=require("../generated/prisma")
+const {PrismaClient,OrgRole}=require("../generated/prisma")
 const gcamprisma = new PrismaClient()
-
+const orgroles = Object.values(OrgRole)
 
 const createOrganization = async (req,res) => {
     try {
@@ -332,6 +332,91 @@ const removeOrgAccess = async (req, res) => {
       status: "success",
       message: "Organization access removal process completed",
       data: results,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+
+const updateUserOrganziationRole = async (req, res) => {
+  try {
+    const { user_id, org_id, role } = req.body;
+
+    if (!user_id || !org_id || !role) {
+      return res.status(400).json({
+        status: "error",
+        message: "Bad request, missing required fields"
+      });
+    }
+
+    // find existing access
+    const orgAccess = await gcamprisma.userOrganization.findUnique({
+      where: {
+        user_id_organization_id: {
+          user_id: Number(user_id),
+          organization_id: Number(org_id),
+        },
+      },
+    });
+
+    if (!orgAccess) {
+      return res.status(404).json({
+        status: "error",
+        message: "Access not found",
+      });
+    }
+
+    const existorgAccessRole = orgAccess.role;
+
+    // validate role
+    if (!orgroles.includes(role)) {
+      return res.status(400).json({
+        status: "error",
+        message: "Invalid org role",
+        allowedroles: orgroles,
+        receivedrole: role,
+      });
+    }
+
+    // no change
+    if (role === existorgAccessRole) {
+      return res.status(200).json({
+        status: "success",
+        message: "No changes made",
+      });
+    }
+
+    // role transition handling
+    if (existorgAccessRole === "USER" && role === "ADMIN") {
+      // remove all device access
+      await gcamprisma.userDevice.deleteMany({
+        where: { user_id: Number(user_id) },
+      });
+    }
+
+    // update organization role
+    await gcamprisma.userOrganization.update({
+      where: {
+        user_id_organization_id: {
+          user_id: Number(user_id),
+          organization_id: Number(org_id),
+        },
+      },
+      data: { role },
+    });
+
+    return res.status(200).json({
+      status: "success",
+      message:
+        existorgAccessRole === "ADMIN" && role === "USER"
+          ? "Role updated to USER, please assign devices later"
+          : "Org Role updated to ADMIN, can access ALL devices",
     });
   } catch (error) {
     console.error(error);

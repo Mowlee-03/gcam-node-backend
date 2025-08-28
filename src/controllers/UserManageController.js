@@ -449,9 +449,146 @@ const deleteUser = async (req, res) => {
 };
 
 
+const usersAndOrganizations = async (req, res) => {
+  try {
+    const users = await gcamprisma.user.findMany({
+      where: { role: "USER" },
+      select: {
+        id: true,
+        username:true,
+        fullname: true,
+        organization: {
+          select: {
+            role: true,
+            organization: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Transform the data to match your required response
+    const result = users.map((user) => ({
+      id: user.id,
+      name: user.fullname ?? user.username,
+      org_count: user.organization.length,
+      organization: user.organization.map((org) => ({
+        id: org.organization.id,
+        name: org.organization.name,
+        role: org.role,
+      })),
+    }));
+
+    return res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+
+const userAndDevices = async (req, res) => {
+  try {
+    const userdata = await gcamprisma.user.findMany({
+      where: {
+        role: "USER",
+        organization: {
+          some: { role: "USER" },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        organization: {
+          select: {
+            role: true,
+            organization: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        device_access: {
+          select: {
+            device: {
+              select: {
+                id: true,
+                imei: true,
+                name: true,
+                organization_id: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // transform
+    const result = userdata.map((user) => {
+      // group devices under their organization
+      const orgs = user.organization.map((org) => {
+        const orgDevices = user.device_access
+          .map((da) => da.device)
+          .filter((d) => d.organization_id === org.organization.id);
+
+        return {
+          id: org.organization.id,
+          name: org.organization.name,
+          role: org.role,
+          devices: orgDevices.map((d) => ({
+            id: d.id,
+            imei: d.imei,
+            name: d.name,
+          })),
+        };
+      });
+
+      const deviceCount = orgs.reduce(
+        (acc, org) => acc + org.devices.length,
+        0
+      );
+
+      return {
+        id: user.id,
+        name: user.name,
+        org_count: orgs.length,
+        device_count: deviceCount,
+        organization: orgs,
+      };
+    });
+
+    return res.status(200).json({
+      status: "success",
+      data: result,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
     createuser,
     getAllUsers,
     updateUser,
-    deleteUser
+    deleteUser,
+    usersAndOrganizations,
+    userAndDevices
 }
