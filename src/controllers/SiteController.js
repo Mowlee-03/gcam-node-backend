@@ -4,7 +4,7 @@ const gcamprisma = new PrismaClient()
 
 const createsite = async (req,res) => {
     try {
-        const {
+        let {
             org_id,
             name,
             location
@@ -26,7 +26,7 @@ const createsite = async (req,res) => {
                 message:"Organization Not found"
             })
         }
-
+        name=name.trim()
         const sitenameCheckInOrganization = await gcamprisma.site.findFirst({
             where:{
                 organization_id:org_id,
@@ -45,7 +45,7 @@ const createsite = async (req,res) => {
             data:{
                 organization_id:org_id,
                 name:name,
-                location:location
+                location:location??[]
             }
         })
 
@@ -120,6 +120,8 @@ const allSiteDetails = async (req, res) => {
 const viewOnesiteDetaily = async (req,res) => {
     try {
         const {site_id}=req.params
+        console.log(typeof(site_id));
+        
         if (!site_id) {
             return res.status(400).json({
                 status:"error",
@@ -127,12 +129,19 @@ const viewOnesiteDetaily = async (req,res) => {
             })
         }
         const sitedetails = await gcamprisma.site.findUnique({
-            where:{ id : site_id},
+            where:{ id : Number(site_id)},
             include:{
                 organization:{ select : { name : true } },
                 devices:true
             }
         })
+
+        if (!sitedetails) {
+            return res.status(404).json({
+                status:"error",
+                message:"Site not found"
+            })
+        }
 
         return res.status(200).json({
             status:"success",

@@ -4,14 +4,14 @@ const orgroles = Object.values(OrgRole)
 
 const createOrganization = async (req,res) => {
     try {
-        const {name}=req.body
+        let {name}=req.body
         if (!name) {
             return res.status(400).json({
                 status:"error",
                 message:"Bad request , name is required"
             })
         }
-
+        name = name.trim();
         const isalreadyExistName = await gcamprisma.organization.findFirst({
             where:{name:name}
         })
@@ -129,9 +129,20 @@ const deleteOrganization = async (req,res) => {
                 message:"Bad request"
             })
         }
+        const data = await gcamprisma.organization.findUnique({
+          where:{id:Number(org_id)}
+        })
+
+        if (!data) {
+          return res.status(404).json({
+            status:"error",
+            message:"Organization not found"
+          })
+        }
         await gcamprisma.organization.delete({
             where:{id:Number(org_id)}
         })
+
 
         return res.status(200).json({
             status:"success",
