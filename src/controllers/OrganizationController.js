@@ -435,5 +435,6 @@ module.exports = {
     updateOrganization,
     deleteOrganization,
     addOrgAccess,
-    removeOrgAccess
+    removeOrgAccess,
+    updateUserOrganziationRole
 }

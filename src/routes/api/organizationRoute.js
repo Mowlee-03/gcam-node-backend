@@ -4,7 +4,9 @@ const {
     updateOrganization,
     getAllOrganization,
     deleteOrganization,
-    addOrgAccess
+    addOrgAccess,
+    updateUserOrganziationRole,
+    removeOrgAccess
  } = require("../../controllers/OrganizationController")
 var router = express.Router()
 
@@ -17,5 +19,6 @@ router.delete("/delete/:org_id",deleteOrganization)
 
 router.post("/add/access/:user_id",addOrgAccess)
 router.delete("/remove/access/:user_id",removeOrgAccess)
+router.put("/user/role/update",updateUserOrganziationRole)
 
 module.exports = router

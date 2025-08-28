@@ -63,6 +63,15 @@ const login = async (req,res) => {
 
 const logout = async (req, res) => {
   try {
+    const token = req.cookies?.gcam_auth_token;
+
+    if (!token) {
+      return res.status(400).json({
+        status: "error",
+        message: "Bad request",
+      });
+    }
+
     res.clearCookie("gcam_auth_token", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

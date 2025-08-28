@@ -65,26 +65,48 @@ const getRegisteredDeviceList = async (req,res) => {
     try {
         const {org_ids} = req.body
 
-        if (!org_ids || !Array.isArray(org_ids || org_ids.length ===0)) {
+        if (Array.isArray(org_ids)) {
+            if (org_ids.length===0) {
+                return res.status(400).json({
+                    status:"error",
+                    message:"Bad request"
+                })
+            }
+
+            const devices = await gcamprisma.device.findMany({
+                where:{organization_id:{in:Number(org_ids)}},
+                select : { 
+                    id      :   true,
+                    imei    :   true,
+                    name    :   true,
+                }
+            })
+
+            return res.status(200).json({
+                status:"success",
+                data:devices
+            })
+        }else if (org_ids==="ALL") {
+            const devices = await gcamprisma.device.findMany({
+                select : { 
+                    id      :   true,
+                    imei    :   true,
+                    name    :   true,
+                }
+            })
+
+            return res.status(200).json({
+                status:"success",
+                data:devices
+            })
+        }else {
             return res.status(400).json({
                 status:"error",
-                message:"Bad request"
+                message:"Something went wrong"
             })
         }
 
-        const devices = await gcamprisma.device.findMany({
-            where:{organization_id:{in:Number(org_ids)}},
-            select : { 
-                id      :   true,
-                imei    :   true,
-                name    :   true,
-             }
-        })
 
-        return res.status(200).json({
-            status:"success",
-            data:devices
-        })
     } catch (error) {
         console.log(error)
         return res.status(500).json({

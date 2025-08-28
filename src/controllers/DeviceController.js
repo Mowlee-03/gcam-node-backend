@@ -246,13 +246,22 @@ const deviceUpdate = async (req, res) => {
       site_id,
       location,
       name,
-      max_count
+      max_count,
+      ...extraFields
     } = req.body;
 
     if (!device_id) {
       return res.status(400).json({
         status: "error",
         message: "Bad request, device_id is required"
+      });
+    }
+
+        // ❌ Check for extra/unknown fields
+    if (Object.keys(extraFields).length > 0) {
+      return res.status(400).json({
+        status: "error",
+        message: `Invalid fields provided: ${Object.keys(extraFields).join(", ")}`
       });
     }
 

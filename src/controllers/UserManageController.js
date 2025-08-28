@@ -4,6 +4,55 @@ const gcamprisma = new PrismaClient()
 const globalroles = Object.values(GlobalRole)
 const orgroles = Object.values(OrgRole)
 
+const inituser = async (req, res) => {
+  try {
+    // check if any user already exists
+    const existingUser = await gcamprisma.user.findFirst();
+    if (existingUser) {
+      return res.status(400).json({
+        status: "error",
+        message: "Initialization already done. Users exist in the system.",
+      });
+    }
+
+    // get user details from body
+    const { fullname, username, password, mobile, } = req.body;
+
+    if (!fullname || !username || !password || !mobile) {
+      return res.status(400).json({
+        status: "error",
+        message: "Missing required fields",
+      });
+    }
+
+    // hash password
+    const hashedPassword = await hashPassword(password)
+
+    // create the first user with ADMIN role
+    const newUser = await gcamprisma.user.create({
+      data: {
+        fullname,
+        username,
+        password: hashedPassword,
+        mobile,
+        role: "SUPERADMIN", // 🚨 give first user admin rights
+      },
+    });
+
+    return res.status(201).json({
+      status: "success",
+      message: "First user created successfully",
+      data: newUser
+    });
+  } catch (error) {
+    console.error("❌ Error creating initial user:", error);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
 
 
 const createuser = async (req, res) => {
@@ -590,5 +639,6 @@ module.exports = {
     updateUser,
     deleteUser,
     usersAndOrganizations,
-    userAndDevices
+    userAndDevices,
+    inituser
 }
