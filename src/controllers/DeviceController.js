@@ -114,7 +114,7 @@ const deviceRegister = async (req, res) => {
       });
     }
 
-    await gcamprisma.$transaction([
+    const [createdDevice] = await gcamprisma.$transaction([
       gcamprisma.device.create({
         data: {
           imei,
@@ -131,6 +131,18 @@ const deviceRegister = async (req, res) => {
         data: { is_registered: true }
       })
     ]);
+
+    // Create LatestLog with mock data
+    await gcamprisma.latestLog.create({
+      data: {
+        device_id: createdDevice.id,
+        imei: createdDevice.imei,
+        organization_name: organizationCheck.name,
+        site_name: siteCheck.name,
+        garbage_image: "mock_garbage.jpg", // put default mock path or URL
+        person_image: "mock_person.jpg"    // put default mock path or URL
+      }
+    });
 
     return res.status(200).json({
       status: "success",
@@ -150,19 +162,40 @@ const deviceRegister = async (req, res) => {
 
 const getdevices = async (req, res) => {
   try {
-    const { role, organizations } = req.body; 
-    // organizations example: [{ id: 1, role: "ADMIN" }, { id: 2, role: "USER", devices: [5,6] }]
+    let { user_id } = req.params;
+
+    if (!user_id) {
+      return res.status(400).json({
+        status: "error",
+        message: "Bad request, user_id is required"
+      });
+    }
+
+    user_id = parseInt(user_id)
+    // 1. Fetch the user with role + organizations + device access
+    const user = await gcamprisma.user.findUnique({
+      where: { id: user_id },
+      include: {
+        organization: {
+          include: { organization: true } // UserOrganization → Organization
+        },
+        device_access: {
+          include: { device: true } // UserDevice → Device
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        status: "error",
+        message: "User not found"
+      });
+    }
 
     let devices = [];
 
-    if (!role) {
-      return res.status(400).json({
-        status:"error",
-        message:"Bad request"
-      })
-    }
-    if (role === "SUPERADMIN") {
-      // Fetch all devices
+    // 2. SUPERADMIN → all devices
+    if (user.role === "SUPERADMIN") {
       devices = await gcamprisma.device.findMany({
         include: {
           organization: { select: { id: true, name: true } },
@@ -170,39 +203,23 @@ const getdevices = async (req, res) => {
         }
       });
 
-    } else if (role === "USER" && Array.isArray(organizations) && organizations.length > 0) {
+    } else {
+      // 3. USER → collect org + device conditions
       let orgConditions = [];
 
-        for (const org of organizations) {
-            // ✅ Basic validation
-            if (!org.id || !org.role) {
-            return res.status(400).json({
-                status: "error",
-                message: `Invalid organization entry: ${JSON.stringify(org)}`
-            });
-            }
-
-            if (org.role === "ADMIN") {
-            // Admin → all devices in org
-            orgConditions.push({ organization_id: org.id });
-
-            } else if (org.role === "USER") {
-            if (!Array.isArray(org.devices)) {
-                return res.status(400).json({
-                status: "error",
-                message: `Invalid , devices must be an array ${org.id}`
-                });
-            }
-            orgConditions.push({ id: { in: org.devices } });
-
-            } else {
-            return res.status(400).json({
-                status: "error",
-                message: `Invalid role "${org.role}" in organization ${org.id}. Must be ADMIN or USER.`
-            });
-            }
+      // From organizations (via UserOrganization)
+      for (const org of user.organization) {
+        if (org.role === "ADMIN") {
+          // Admin → all devices in org
+          orgConditions.push({ organization_id: org.organization_id });
+        } else if (org.role === "USER") {
+          // User → specific devices linked in UserDevice
+          const deviceIds = user.device_access.map(d => d.device_id);
+          if (deviceIds.length > 0) {
+            orgConditions.push({ id: { in: deviceIds } });
+          }
         }
-
+      }
 
       if (orgConditions.length > 0) {
         devices = await gcamprisma.device.findMany({
@@ -213,11 +230,6 @@ const getdevices = async (req, res) => {
           }
         });
       }
-    } else {
-      return res.status(400).json({
-        status: "error",
-        message: "Invalid role or organization filter."
-      });
     }
 
     return res.status(200).json({

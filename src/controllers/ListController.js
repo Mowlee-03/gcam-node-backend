@@ -29,10 +29,22 @@ const getOrganizationList = async (req,res) => {
 const getSitesForOneOrganization = async (req,res) => {
     try {
         const {org_id} = req.params
-        if (!org_id) {
-            return res.status(400).json({
+            // validate first
+        if (!org_id || isNaN(Number(org_id))) {
+        return res.status(400).json({
+            status: "error",
+            message: "Bad request, missing or invalid org_id",
+        });
+        }
+
+        const checkorgExist = await gcamprisma.organization.findUnique({
+            where:{id:Number(org_id)}
+        })
+
+        if (!checkorgExist) {
+            return res.status(404).json({
                 status:"error",
-                message:"Bad request , missing required field"
+                message:"Organization not found"
             })
         }
 
@@ -74,7 +86,7 @@ const getRegisteredDeviceList = async (req,res) => {
             }
 
             const devices = await gcamprisma.device.findMany({
-                where:{organization_id:{in:Number(org_ids)}},
+                where:{organization_id:{in:org_ids}},
                 select : { 
                     id      :   true,
                     imei    :   true,

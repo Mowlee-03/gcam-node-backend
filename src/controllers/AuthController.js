@@ -6,6 +6,15 @@ const gcamprisma = new PrismaClient()
 const login = async (req,res) => {
     try {
         const {username , password} = req.body
+
+        const existingToken = req.cookies?.gcam_auth_token;
+        if (existingToken) {
+          return res.status(400).json({
+            status: "error",
+            message: "Already logged in",
+          });
+        }
+
         if (!username || !password) {
             return res.status(400).json({
                 status:"error",
