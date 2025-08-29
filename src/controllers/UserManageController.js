@@ -124,7 +124,7 @@ const createuser = async (req, res) => {
       if (missingOrgs.length > 0) {
         const missingOrgNames = missingOrgs.map(id => {
           const org = organizations.find(o => o.id === id);
-          return org ? `id:${org.id}` : id;
+          return org ? org.id : id;
         });
         return res.status(400).json({
           status: "error",

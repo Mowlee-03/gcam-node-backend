@@ -40,32 +40,39 @@ const createOrganization = async (req,res) => {
     }
 }
 
+const getAllOrganization = async (req, res) => {
+  try {
+    const orgDatas = await gcamprisma.organization.findMany({
+      include: {
+        _count: {
+          select: {
+            sites: true,
+            devices: true,
+          },
+        },
+      },
+    });
 
-const getAllOrganization = async (req,res) => {
-    try {
-        const orgDatas = await gcamprisma.organization.findMany(
-            {
-                include:{
-                    sites:true,
-                    devices:true
-                }
-            }
-    )
+    const formattedOrgs = orgDatas.map(({ _count, ...org }) => ({
+      ...org,                // keep all organization columns
+      sites: _count.sites,   // add count
+      devices: _count.devices,
+    }));
 
-        return res.status(200).json({
-            status:"success",
-            message:"Fetching organizations with details success",
-            data:orgDatas
-        })
-    } catch (error) {
-        console.log(error)
-        return res.status(500).json({
-            status:"error",
-            message:"Internal Server Error",
-            error:error.message
-        })
-    }
-}
+    return res.status(200).json({
+      status: "success",
+      message: "Fetching organizations with counts success",
+      data: formattedOrgs,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
 
 
 const updateOrganization = async (req,res) => {
