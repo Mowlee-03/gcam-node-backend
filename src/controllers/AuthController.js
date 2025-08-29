@@ -9,8 +9,8 @@ const login = async (req,res) => {
 
         const existingToken = req.cookies?.gcam_auth_token;
         if (existingToken) {
-          return res.status(400).json({
-            status: "error",
+          return res.status(409).json({
+            status: "success",
             message: "Already logged in",
           });
         }
