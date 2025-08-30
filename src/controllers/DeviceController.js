@@ -1,6 +1,6 @@
 const {PrismaClient}=require("../generated/prisma")
 const gcamprisma = new PrismaClient()
-
+//POST - /gcam/common/device/create
 const createDevice = async (req,res) => {
     try {
         const { imei , video_url } = req.body
@@ -114,6 +114,12 @@ const deviceRegister = async (req, res) => {
       });
     }
 
+    if (location && !Array.isArray(location)) {
+      return res.status(400).json({
+        status:"error",
+        message:"Invalid location data"
+      })
+    }
     const [createdDevice] = await gcamprisma.$transaction([
       gcamprisma.device.create({
         data: {
@@ -330,7 +336,6 @@ const deviceUpdate = async (req, res) => {
       return res.status(200).json({
         status: "info",
         message: "No changes detected, device not updated",
-        data: device
       });
     }
 

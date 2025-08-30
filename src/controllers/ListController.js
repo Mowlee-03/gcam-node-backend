@@ -1,7 +1,7 @@
 const {PrismaClient,GlobalRole,OrgRole}=require("../generated/prisma")
 const gcamprisma = new PrismaClient()
 
-
+//GET - /api/list/organizations
 const getOrganizationList = async (req,res) => {
     try {
         const orgData = await gcamprisma.organization.findMany({
@@ -25,7 +25,7 @@ const getOrganizationList = async (req,res) => {
     }
 }
 
-
+//GET - /api/list/organization/:org_id/sites
 const getSitesForOneOrganization = async (req,res) => {
     try {
         const {org_id} = req.params
@@ -72,7 +72,7 @@ const getSitesForOneOrganization = async (req,res) => {
     }
 }
 
-
+//POST - /api/list/registered/devices
 const getRegisteredDeviceList = async (req,res) => {
     try {
         const {org_ids} = req.body
@@ -130,6 +130,7 @@ const getRegisteredDeviceList = async (req,res) => {
 }
  
 
+//GET - /api/list/not-registered/devices
 const getnonRegisteredDevicelist = async (req,res) => {
     try {
         const data = await gcamprisma.installedDevice.findMany({
