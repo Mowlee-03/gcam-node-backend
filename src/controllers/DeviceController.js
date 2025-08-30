@@ -44,7 +44,7 @@ const createDevice = async (req,res) => {
     }
 }
 
-
+//POST - /api/device/register
 const deviceRegister = async (req, res) => {
   try {
     const {
@@ -159,7 +159,7 @@ const deviceRegister = async (req, res) => {
   }
 };
 
-
+//POST - /api/device/viewall/:user_id
 const getdevices = async (req, res) => {
   try {
     let { user_id } = req.params;
@@ -248,7 +248,7 @@ const getdevices = async (req, res) => {
 };
 
 
-
+//PUT - /api/device/update/:device_id
 const deviceUpdate = async (req, res) => {
   try {
     const { device_id } = req.params;
@@ -356,7 +356,7 @@ const deviceUpdate = async (req, res) => {
 };
 
 
-
+//DELETE - /api/device/delete/:device_id
 const deviceDelete = async (req,res) => {
     try {
         const {device_id} = req.params
@@ -385,7 +385,7 @@ const deviceDelete = async (req,res) => {
     }
 }
 
-
+//POST - /api/device/add/access/:user_id
 const addDeviceAccess = async (req, res) => {
   try {
     const { user_id } = req.params;
@@ -488,7 +488,7 @@ const addDeviceAccess = async (req, res) => {
   }
 };
 
-
+//POST - /api/device/remove/access/:user_id
 const removeDeviceAccess = async (req, res) => {
   try {
     const { user_id } = req.params;

@@ -4,6 +4,7 @@ const gcamprisma = new PrismaClient()
 const globalroles = Object.values(GlobalRole)
 const orgroles = Object.values(OrgRole)
 
+// POST - /gcam/common/init/user
 const inituser = async (req, res) => {
   try {
     // check if any user already exists
@@ -54,7 +55,7 @@ const inituser = async (req, res) => {
   }
 };
 
-
+// POST - api/user/create 
 const createuser = async (req, res) => {
   const {
     username,
@@ -244,7 +245,7 @@ const createuser = async (req, res) => {
   }
 };
 
-// ✅ Get all users with org + device access
+// GET - /api/user/viewall
 const getAllUsers = async (req, res) => {
   try {
     const users = await gcamprisma.user.findMany({
@@ -256,7 +257,15 @@ const getAllUsers = async (req, res) => {
         },
         device_access: {
           include: {
-            device: true, // device info
+            device: {
+              select:{
+                id:true,
+                imei:true,
+                name:true,
+                video_url:true,
+                organization_id:true
+              }
+            }, // device info
           },
         },
       },
@@ -293,6 +302,12 @@ const getAllUsers = async (req, res) => {
             // ADMIN inside org → all devices of that org
             const allDevices = await gcamprisma.device.findMany({
               where: { organization_id: org.id },
+              select:{
+                id:true,
+                imei:true,
+                name:true,
+                video_url:true,
+              }
             });
 
             orgAccess.push({
@@ -303,10 +318,15 @@ const getAllUsers = async (req, res) => {
               devices: allDevices,
             });
           } else {
-            // USER inside org → only specific devices linked
+           // USER → only specific devices
             const allowedDevices = user.device_access
               .filter((ud) => ud.device.organization_id === org.id)
-              .map((ud) => ud.device);
+              .map((ud) => ({
+                id: ud.device.id,
+                imei: ud.device.imei,
+                name: ud.device.name,
+                video_url: ud.device.video_url,
+              }));
 
             orgAccess.push({
               id: org.id,
@@ -344,6 +364,7 @@ const getAllUsers = async (req, res) => {
 };
 
 
+//PUT - /api/user/update/:user_id
 const updateUser = async (req, res) => {
   const { user_id } = req.params;
   const { username, fullname, mobile, role, } = req.body;
@@ -442,7 +463,7 @@ const updateUser = async (req, res) => {
 };
 
 
-
+//Delete - /api/user/delete/:user_id
 const deleteUser = async (req, res) => {
   const { user_id } = req.params;
 
@@ -498,6 +519,7 @@ const deleteUser = async (req, res) => {
 };
 
 
+// GET - /api/user/organization/details
 const usersAndOrganizations = async (req, res) => {
   try {
     const users = await gcamprisma.user.findMany({
@@ -547,6 +569,7 @@ const usersAndOrganizations = async (req, res) => {
 };
 
 
+// GET - /api/user/device/details
 const userAndDevices = async (req, res) => {
   try {
     const userdata = await gcamprisma.user.findMany({
@@ -558,7 +581,8 @@ const userAndDevices = async (req, res) => {
       },
       select: {
         id: true,
-        name: true,
+        username: true,
+        fullname:true,
         organization: {
           select: {
             role: true,
@@ -612,7 +636,8 @@ const userAndDevices = async (req, res) => {
 
       return {
         id: user.id,
-        name: user.name,
+        username: user.username,
+        fullname:user.fullname,
         org_count: orgs.length,
         device_count: deviceCount,
         organization: orgs,

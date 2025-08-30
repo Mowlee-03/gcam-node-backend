@@ -21,12 +21,13 @@ const verifyToken = (token) => {
 
 
 const setAuthTokenCookie = (res, cookiename,token) => {   
-      res.cookie(cookiename, token, {
-          httpOnly: true, // Prevent access from JavaScript (mitigates XSS attacks)
-          secure: process.env.NODE_ENV==="production",
-          sameSite: "None", // Protect against CSRF
-          maxAge: 24 * 60 * 60 * 1000, 
-      });
+      res.cookie("gcam_auth_token", token, {
+            httpOnly: true,
+            secure: true,      // 🚨 false, because you are on plain http
+            sameSite: "None",   // 🚨 must be None for cross-IP
+            path: "/",
+            maxAge: 24 * 60 * 60 * 1000
+        });
     };
 
 

@@ -2,6 +2,8 @@ const {PrismaClient,OrgRole}=require("../generated/prisma")
 const gcamprisma = new PrismaClient()
 const orgroles = Object.values(OrgRole)
 
+
+// POST - /api/organization/create
 const createOrganization = async (req,res) => {
     try {
         let {name}=req.body
@@ -40,6 +42,7 @@ const createOrganization = async (req,res) => {
     }
 }
 
+// GET - /api/organization/viewall
 const getAllOrganization = async (req, res) => {
   try {
     const orgDatas = await gcamprisma.organization.findMany({
@@ -74,7 +77,7 @@ const getAllOrganization = async (req, res) => {
   }
 };
 
-
+//PUT - /api/organization/update/:org_id
 const updateOrganization = async (req,res) => {
     const {org_id}=req.params
     const {name}=req.body
@@ -126,7 +129,7 @@ const updateOrganization = async (req,res) => {
     }
 }
 
-
+//DELETE - /api/organization/delete/:org_id
 const deleteOrganization = async (req,res) => {
     const {org_id} = req.params
     try {
@@ -166,7 +169,7 @@ const deleteOrganization = async (req,res) => {
 }
 
 
-
+// POST - /api/organization/add/access/:user_id
 const addOrgAccess = async (req, res) => {
   try {
     const { user_id } = req.params;
@@ -272,7 +275,7 @@ const addOrgAccess = async (req, res) => {
 };
 
 
-
+// Delete - /api/organization/remove/access/:user_id
 const removeOrgAccess = async (req, res) => {
   try {
     const { user_id } = req.params;
@@ -361,7 +364,7 @@ const removeOrgAccess = async (req, res) => {
   }
 };
 
-
+// PUT - /api/organization/remove/access/:user_id
 const updateUserOrganziationRole = async (req, res) => {
   try {
     const { user_id, org_id, role } = req.body;

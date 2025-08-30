@@ -1,7 +1,7 @@
 const {PrismaClient}=require("../generated/prisma")
 const gcamprisma = new PrismaClient()
 
-
+// POST - /api/site/create
 const createsite = async (req,res) => {
     try {
         let {
@@ -65,7 +65,7 @@ const createsite = async (req,res) => {
     }
 }
 
-
+//POST - /api/site/viewall
 const allSiteDetails = async (req, res) => {
     try {
         const { organization } = req.body;
@@ -116,7 +116,7 @@ const allSiteDetails = async (req, res) => {
     }
 };
 
-
+//GET - /api/site/view/:site_id
 const viewOnesiteDetaily = async (req,res) => {
     try {
         const {site_id}=req.params
@@ -157,7 +157,7 @@ const viewOnesiteDetaily = async (req,res) => {
     }
 }
 
-
+//PUT - /api/site/update/:site_id
 const updateSite = async (req, res) => {
   const { site_id } = req.params;
   const { name, location } = req.body;
@@ -214,7 +214,7 @@ const updateSite = async (req, res) => {
   }
 };
 
-
+//DELETE - /api/site/delete/:site_id
 const deleteSite = async (req,res) => {
     try {
         const {site_id}=req.params
