@@ -154,7 +154,8 @@ model LatestLog {
   site_name         String
   garbage_image     String
   person_image      String
-
+  garbage_date      DateTime
+  person_date       DateTime
   update_at         DateTime             @updatedAt
   created_at        DateTime             @default(now())
 

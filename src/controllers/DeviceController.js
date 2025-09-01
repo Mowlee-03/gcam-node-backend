@@ -146,7 +146,9 @@ const deviceRegister = async (req, res) => {
         organization_name: organizationCheck.name,
         site_name: siteCheck.name,
         garbage_image: "mock_garbage.jpg", // put default mock path or URL
-        person_image: "mock_person.jpg"    // put default mock path or URL
+        person_image: "mock_person.jpg",    // put default mock path or URL
+        garbage_date:new Date(),
+        person_date:new Date()
       }
     });
 
@@ -203,10 +205,12 @@ const getdevices = async (req, res) => {
     // 2. SUPERADMIN → all devices
     if (user.role === "SUPERADMIN") {
       devices = await gcamprisma.device.findMany({
-        include: {
+        select: {
+          id:true,imei:true,video_url:true,name:true,location:true,max_count:true,
+          site:{select:{id:true,name:true}},
           organization: { select: { id: true, name: true } },
           latestlog: true
-        }
+        },
       });
 
     } else {
@@ -230,10 +234,12 @@ const getdevices = async (req, res) => {
       if (orgConditions.length > 0) {
         devices = await gcamprisma.device.findMany({
           where: { OR: orgConditions },
-          include: {
+          select: {
+            id:true,imei:true,video_url:true,name:true,location:true,max_count:true,
+            site:{select:{id:true,name:true}},
             organization: { select: { id: true, name: true } },
             latestlog: true
-          }
+          },
         });
       }
     }
