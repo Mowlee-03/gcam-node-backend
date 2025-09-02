@@ -131,3 +131,8 @@ const garbagelog = async (req, res) => {
     }
 };
 
+
+module.exports = {
+    garbagelog
+}
+

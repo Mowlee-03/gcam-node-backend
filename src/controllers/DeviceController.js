@@ -139,7 +139,7 @@ const deviceRegister = async (req, res) => {
     ]);
 
     // Create LatestLog with mock data
-    await gcamprisma.latestLog.create({
+     gcamprisma.latestLog.create({
       data: {
         device_id: createdDevice.id,
         imei: createdDevice.imei,
@@ -148,7 +148,8 @@ const deviceRegister = async (req, res) => {
         garbage_image: "mock_garbage.jpg", // put default mock path or URL
         person_image: "mock_person.jpg",    // put default mock path or URL
         garbage_date:new Date(),
-        person_date:new Date()
+        person_date:new Date(),
+        box_count:0
       }
     });
 
