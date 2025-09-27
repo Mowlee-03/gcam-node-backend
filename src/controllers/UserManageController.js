@@ -604,6 +604,11 @@ const userAndDevices = async (req, res) => {
           },
         },
         device_access: {
+          where:{
+            device:{
+              is_active:true
+            },
+          },
           select: {
             device: {
               select: {
@@ -611,6 +616,7 @@ const userAndDevices = async (req, res) => {
                 imei: true,
                 name: true,
                 organization_id: true,
+                is_active:true
               },
             },
           },

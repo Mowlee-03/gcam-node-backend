@@ -168,88 +168,35 @@ const deviceRegister = async (req, res) => {
   }
 };
 
-//POST - /api/device/viewall/:user_id
-const getdevices = async (req, res) => {
+// GET - /api/device/all
+const getAllDevcies = async (req,res) => {
   try {
-    let { user_id } = req.params;
-
-    if (!user_id) {
-      return res.status(400).json({
-        status: "error",
-        message: "Bad request, user_id is required"
-      });
-    }
-
-    user_id = parseInt(user_id)
-    // 1. Fetch the user with role + organizations + device access
-    const user = await gcamprisma.user.findUnique({
-      where: { id: user_id },
-      include: {
-        organization: {
-          include: { organization: true } // UserOrganization → Organization
+    const devicedata = await gcamprisma.device.findMany({
+      select:{
+        id:true,
+        imei:true,
+        name:true,
+        location:true,
+        is_active:true,
+        site:{
+          select:{
+            id:true,
+            name:true
+          }
         },
-        device_access: {
-          include: { device: true } // UserDevice → Device
-        }
-      }
-    });
-
-    if (!user) {
-      return res.status(404).json({
-        status: "error",
-        message: "User not found"
-      });
-    }
-
-    let devices = [];
-
-    // 2. SUPERADMIN → all devices
-    if (user.role === "SUPERADMIN") {
-      devices = await gcamprisma.device.findMany({
-        select: {
-          id:true,imei:true,video_url:true,name:true,location:true,max_count:true,
-          site:{select:{id:true,name:true}},
-          organization: { select: { id: true, name: true } },
-          latestlog: true
-        },
-      });
-
-    } else {
-      // 3. USER → collect org + device conditions
-      let orgConditions = [];
-
-      // From organizations (via UserOrganization)
-      for (const org of user.organization) {
-        if (org.role === "ADMIN") {
-          // Admin → all devices in org
-          orgConditions.push({ organization_id: org.organization_id });
-        } else if (org.role === "USER") {
-          // User → specific devices linked in UserDevice
-          const deviceIds = user.device_access.map(d => d.device_id);
-          if (deviceIds.length > 0) {
-            orgConditions.push({ id: { in: deviceIds } });
+        organization:{
+          select:{
+            id:true,
+            name:true
           }
         }
       }
+    })
 
-      if (orgConditions.length > 0) {
-        devices = await gcamprisma.device.findMany({
-          where: { OR: orgConditions },
-          select: {
-            id:true,imei:true,video_url:true,name:true,location:true,max_count:true,
-            site:{select:{id:true,name:true}},
-            organization: { select: { id: true, name: true } },
-            latestlog: true
-          },
-        });
-      }
-    }
-
-    return res.status(200).json({
-      status: "success",
-      data: devices
-    });
-
+    res.status(200).json({
+      status:"success",
+      data:devicedata
+    })
   } catch (error) {
     console.error(error);
     return res.status(500).json({
@@ -258,21 +205,19 @@ const getdevices = async (req, res) => {
       error: error.message
     });
   }
-};
-
+}
 
 //PUT - /api/device/update/:device_id
-const deviceUpdate = async (req, res) => {
+const updateDevice = async (req, res) => {
   try {
     const { device_id } = req.params;
-    const {
-      video_url,
+    const { 
+      name,
+      location,
       organization_id,
       site_id,
-      location,
-      name,
-      max_count,
-      ...extraFields
+      is_active,
+      ...extraFields 
     } = req.body;
 
     if (!device_id) {
@@ -282,7 +227,6 @@ const deviceUpdate = async (req, res) => {
       });
     }
 
-        // ❌ Check for extra/unknown fields
     if (Object.keys(extraFields).length > 0) {
       return res.status(400).json({
         status: "error",
@@ -302,9 +246,11 @@ const deviceUpdate = async (req, res) => {
       });
     }
 
-    // Build update data by comparing values
     const updateData = {};
-    if (video_url && video_url !== device.video_url) updateData.video_url = video_url;
+    let deleteUserDevice = false;
+
+    if (name && name !== device.name) updateData.name = name;
+
     if (organization_id && Number(organization_id) !== device.organization_id) {
       const orgCheck = await gcamprisma.organization.findUnique({
         where: { id: Number(organization_id) }
@@ -316,14 +262,14 @@ const deviceUpdate = async (req, res) => {
         });
       }
       updateData.organization_id = Number(organization_id);
+      deleteUserDevice = true; // only delete if organization changes
     }
+
     if (site_id && Number(site_id) !== device.site_id) {
       const siteCheck = await gcamprisma.site.findFirst({
         where: {
           id: Number(site_id),
-          organization_id: organization_id
-            ? Number(organization_id)
-            : device.organization_id
+          organization_id: organization_id ? Number(organization_id) : device.organization_id
         }
       });
       if (!siteCheck) {
@@ -334,11 +280,13 @@ const deviceUpdate = async (req, res) => {
       }
       updateData.site_id = Number(site_id);
     }
-    if (location && location !== device.location) updateData.location = location;
-    if (name && name !== device.name) updateData.name = name;
-    if (max_count && Number(max_count) !== device.max_count) updateData.max_count = Number(max_count);
 
-    // If no changes, return early
+    if (location && location !== device.location) updateData.location = location;
+
+    if (is_active !== undefined && is_active !== device.is_active) {
+      updateData.is_active = Boolean(is_active);
+    }
+
     if (Object.keys(updateData).length === 0) {
       return res.status(200).json({
         status: "info",
@@ -346,17 +294,28 @@ const deviceUpdate = async (req, res) => {
       });
     }
 
-    // Update only modified fields
-    const updatedDevice = await gcamprisma.device.update({
+    let message = "Device updated successfully";
+
+    // Delete UserDevice entries only if organization changed
+    if (deleteUserDevice) {
+      await gcamprisma.userDevice.deleteMany({
+        where: {
+          device_id: Number(device_id)
+        }
+      });
+      message += " | All user relations for this device have been removed due to organization change";
+    }
+
+    await gcamprisma.device.update({
       where: { id: Number(device_id) },
       data: updateData
     });
 
     return res.status(200).json({
       status: "success",
-      message: "Device updated successfully",
-      data: updatedDevice
+      message
     });
+
   } catch (error) {
     console.error(error);
     return res.status(500).json({
@@ -366,6 +325,7 @@ const deviceUpdate = async (req, res) => {
     });
   }
 };
+
 
 
 //DELETE - /api/device/delete/:device_id
@@ -597,12 +557,187 @@ const removeDeviceAccess = async (req, res) => {
   }
 };
 
+
+
+//POST - /api/device/viewall/:user_id
+const getdevicesforuser = async (req, res) => {
+  try {
+    let { user_id } = req.params;
+
+    if (!user_id) {
+      return res.status(400).json({
+        status: "error",
+        message: "Bad request, user_id is required"
+      });
+    }
+
+    user_id = parseInt(user_id);
+
+    // 1. Fetch the user with role + organizations + device access
+    const user = await gcamprisma.user.findUnique({
+      where: { id: user_id },
+      include: {
+        organization: {
+          include: { organization: true } // UserOrganization → Organization
+        },
+        device_access: {
+          include: { device: true } // UserDevice → Device
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        status: "error",
+        message: "User not found"
+      });
+    }
+
+    let devices = [];
+
+    // 2. SUPERADMIN → all active devices
+    if (user.role === "SUPERADMIN") {
+      devices = await gcamprisma.device.findMany({
+        where: { is_active: true },
+        select: {
+          id: true,
+          imei: true,
+          video_url: true,
+          name: true,
+          location: true,
+          site: { select: { id: true, name: true } },
+          organization: { select: { id: true, name: true } },
+          latestlog: true
+        }
+      });
+    } else {
+      // 3. USER → collect org + device conditions
+      let orgConditions = [];
+
+      for (const org of user.organization) {
+        if (org.role === "ADMIN") {
+          // Admin → all devices in org
+          orgConditions.push({
+            organization_id: org.organization_id,
+            is_active: true
+          });
+        } else if (org.role === "USER") {
+          const deviceIds = user.device_access.map(d => d.device_id);
+          if (deviceIds.length > 0) {
+            orgConditions.push({
+              id: { in: deviceIds },
+              is_active: true
+            });
+          }
+        }
+      }
+
+      if (orgConditions.length > 0) {
+        devices = await gcamprisma.device.findMany({
+          where: { OR: orgConditions },
+          select: {
+            id: true,
+            imei: true,
+            video_url: true,
+            name: true,
+            location: true,
+            site: { select: { id: true, name: true } },
+            organization: { select: { id: true, name: true } },
+            latestlog: true
+          }
+        });
+      }
+    }
+
+    return res.status(200).json({
+      status: "success",
+      data: devices
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message
+    });
+  }
+};
+
+
+//PUT - /api/device/garbage_count/update/:device_id
+const deviceGarbageCountUpdate = async (req, res) => {
+  try {
+    const { device_id } = req.params;
+    const { max_count, ...extraFields } = req.body;
+
+    if (!device_id) {
+      return res.status(400).json({
+        status: "error",
+        message: "Bad request, device_id is required"
+      });
+    }
+
+    // ❌ Reject any extra fields
+    if (Object.keys(extraFields).length > 0) {
+      return res.status(400).json({
+        status: "error",
+        message: `Only 'max_count' can be updated. Invalid fields provided: ${Object.keys(extraFields).join(", ")}`
+      });
+    }
+
+    // Find existing device
+    const device = await gcamprisma.device.findUnique({
+      where: { id: Number(device_id) }
+    });
+
+    if (!device) {
+      return res.status(404).json({
+        status: "error",
+        message: "Device not found"
+      });
+    }
+
+    // Check if max_count is provided and different
+    if (max_count === undefined || Number(max_count) === device.max_count) {
+      return res.status(200).json({
+        status: "info",
+        message: "No changes detected, device not updated",
+      });
+    }
+
+    // Update max_count only
+    await gcamprisma.device.update({
+      where: { id: Number(device_id) },
+      data: { max_count: Number(max_count) }
+    });
+
+    return res.status(200).json({
+      status: "success",
+      message: "Device garbage count updated successfully",
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message
+    });
+  }
+};
+
+
 module.exports = {
     createDevice,
     deviceRegister,
-    getdevices,
-    deviceUpdate,
+    getAllDevcies,
+    updateDevice,
     deviceDelete,
     addDeviceAccess,
-    removeDeviceAccess
+    removeDeviceAccess,
+
+
+    getdevicesforuser,
+    deviceGarbageCountUpdate,
 }

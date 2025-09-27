@@ -1,24 +1,27 @@
 var express = require("express")
 const { 
     deviceRegister, 
-    getdevices, 
-    deviceUpdate, 
+
     deviceDelete,
     addDeviceAccess,
-    removeDeviceAccess
+    removeDeviceAccess,
+    getdevicesforuser,
+    deviceGarbageCountUpdate,
+    getAllDevcies,
+    updateDevice
 } = require("../../controllers/DeviceController")
 var router = express.Router()
 
 
 router.post("/register",deviceRegister)
-router.get("/viewall/:user_id",getdevices)
-router.put("/update/:device_id",deviceUpdate)
 router.delete("/delete/:device_id",deviceDelete)
-
-
+router.get("/all",getAllDevcies)
+router.put("/update/:device_id",updateDevice)
 router.post("/add/access/:user_id",addDeviceAccess)
 router.delete("/remove/access/:user_id",removeDeviceAccess)
 
 
-
+//FOR USER
+router.get("/viewall/:user_id",getdevicesforuser)
+router.put("/garbage_count/update/:device_id",deviceGarbageCountUpdate)
 module.exports = router

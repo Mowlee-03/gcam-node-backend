@@ -104,6 +104,7 @@ model Device {
   latestlog       LatestLog?
   site            Site?                @relation(fields: [site_id],references: [id],onDelete: SetNull,onUpdate: Cascade)
   organization    Organization?          @relation(fields: [organization_id],references: [id],onDelete: SetNull,onUpdate: Cascade)
+  is_active       Boolean             @default(true)
 }
 
 model UserDevice {
