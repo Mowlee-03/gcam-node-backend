@@ -120,9 +120,8 @@ const allSiteDetails = async (req, res) => {
 const viewOnesiteDetaily = async (req,res) => {
     try {
         const {site_id}=req.params
-        console.log(typeof(site_id));
-        
-        if (!site_id) {
+
+        if (!site_id|| isNaN(site_id)) {
             return res.status(400).json({
                 status:"error",
                 message:"Bad request , missing required field"
@@ -163,7 +162,7 @@ const updateSite = async (req, res) => {
   const { name, location } = req.body;
 
   try {
-    if (!site_id || !name || !location || !Array.isArray(location)) {
+    if (!site_id|| isNaN(site_id) || !name || !location || !Array.isArray(location)) {
       return res.status(400).json({
         status: "error",
         message: "Bad request, missing required fields"
@@ -218,7 +217,7 @@ const updateSite = async (req, res) => {
 const deleteSite = async (req,res) => {
     try {
         const {site_id}=req.params
-        if (!site_id) {
+        if (!site_id || isNaN(site_id)) {
             return res.status(400).json({
                 status:"error",
                 message:"Bad request , missing required field"

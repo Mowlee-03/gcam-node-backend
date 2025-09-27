@@ -82,7 +82,7 @@ const updateOrganization = async (req,res) => {
     const {org_id}=req.params
     const {name}=req.body
     try {
-        if (!org_id || !name) {
+        if (!org_id|| isNaN(org_id) || !name) {
             return res.status(400).json({
                 status:400,
                 message:"Bad request"
@@ -133,7 +133,7 @@ const updateOrganization = async (req,res) => {
 const deleteOrganization = async (req,res) => {
     const {org_id} = req.params
     try {
-        if (!org_id) {
+        if (!org_id|| isNaN(org_id)) {
             return res.status(400).json({
                 status:"error",
                 message:"Bad request"
@@ -175,7 +175,7 @@ const addOrgAccess = async (req, res) => {
     const { user_id } = req.params;
     const { organization } = req.body; // [{id:1,role:"ADMIN"},{id:2,role:"USER"}]
 
-    if (!user_id) {
+    if (!user_id|| isNaN(user_id)) {
       return res.status(400).json({
         status: "error",
         message: "Bad request, user_id required",
@@ -281,7 +281,7 @@ const removeOrgAccess = async (req, res) => {
     const { user_id } = req.params;
     const { organization } = req.body; // [{id:1,name:""}, {id:2,name:""}]
 
-    if (!user_id) {
+    if (!user_id|| isNaN(user_id)) {
       return res.status(400).json({
         status: "error",
         message: "Bad request, user_id required",

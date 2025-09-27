@@ -220,7 +220,7 @@ const updateDevice = async (req, res) => {
       ...extraFields 
     } = req.body;
 
-    if (!device_id) {
+    if (!device_id|| isNaN(device_id)) {
       return res.status(400).json({
         status: "error",
         message: "Bad request, device_id is required"
@@ -327,12 +327,11 @@ const updateDevice = async (req, res) => {
 };
 
 
-
 //DELETE - /api/device/delete/:device_id
 const deviceDelete = async (req,res) => {
     try {
         const {device_id} = req.params
-        if (!device_id) {
+        if (!device_id|| isNaN(device_id)) {
             return res.status(400).json({
                 status:"error",
                 message:"Bad request"
@@ -363,7 +362,7 @@ const addDeviceAccess = async (req, res) => {
     const { user_id } = req.params;
     const { devices } = req.body; // [1, 2, 3]
 
-    if (!user_id || !Array.isArray(devices) || devices.length === 0) {
+    if (!user_id|| isNaN(user_id) || !Array.isArray(devices) || devices.length === 0) {
       return res.status(400).json({
         status: "error",
         message: "Bad request. user_id and devices[] are required",
@@ -466,7 +465,7 @@ const removeDeviceAccess = async (req, res) => {
     const { user_id } = req.params;
     const { devices } = req.body; // [1, 2, 3]
 
-    if (!user_id || !Array.isArray(devices) || devices.length === 0) {
+    if (!user_id|| isNaN(user_id) || !Array.isArray(devices) || devices.length === 0) {
       return res.status(400).json({
         status: "error",
         message: "Bad request. user_id and devices[] are required",
@@ -559,12 +558,14 @@ const removeDeviceAccess = async (req, res) => {
 
 
 
+// FOR USER 
+
 //POST - /api/device/viewall/:user_id
 const getdevicesforuser = async (req, res) => {
   try {
     let { user_id } = req.params;
 
-    if (!user_id) {
+    if (!user_id|| isNaN(user_id)) {
       return res.status(400).json({
         status: "error",
         message: "Bad request, user_id is required"
@@ -671,7 +672,7 @@ const deviceGarbageCountUpdate = async (req, res) => {
     const { device_id } = req.params;
     const { max_count, ...extraFields } = req.body;
 
-    if (!device_id) {
+    if (!device_id|| isNaN(device_id)) {
       return res.status(400).json({
         status: "error",
         message: "Bad request, device_id is required"
@@ -728,6 +729,107 @@ const deviceGarbageCountUpdate = async (req, res) => {
 };
 
 
+// GET - /api/device/location/details/:user_id
+const deviceLocationDetails = async (req, res) => {
+  try {
+    let { user_id } = req.params;
+    if (!user_id|| isNaN(user_id)) {
+      return res.status(400).json({
+        status: "error",
+        message: "Bad request, missing user_id",
+      });
+    }
+
+    user_id = Number(user_id);
+
+    // Fetch user with device access
+    const user = await gcamprisma.user.findUnique({
+      where: { id: user_id },
+      include: {
+        organization: {
+          include: {
+            organization: true,
+          },
+        },
+        device_access: {
+          include: {
+            device: {
+              select: {
+                id: true,
+                imei: true,
+                name: true,
+                location: true,
+                organization_id: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        status: "error",
+        message: "User not found",
+      });
+    }
+
+    // Block SUPERADMIN
+    if (user.role === "SUPERADMIN") {
+      return res.status(403).json({
+        status: "error",
+        message: "Access denied for SUPERADMIN, this data is only for USER",
+      });
+    }
+
+    // Collect devices
+    let devices = [];
+
+    for (const orgLink of user.organization) {
+      const org = orgLink.organization;
+
+      if (orgLink.role === "ADMIN") {
+        // Admin: all devices in this org
+        const allDevices = await gcamprisma.device.findMany({
+          where: { organization_id: org.id },
+          select: {
+            id: true,
+            imei: true,
+            name: true,
+            location: true,
+          },
+        });
+        devices.push(...allDevices);
+      } else {
+        // User: only allowed devices
+        const allowedDevices = user.device_access
+          .filter((ud) => ud.device.organization_id === org.id)
+          .map((ud) => ({
+            id: ud.device.id,
+            imei: ud.device.imei,
+            name: ud.device.name,
+            location: ud.device.location,
+          }));
+        devices.push(...allowedDevices);
+      }
+    }
+
+    return res.status(200).json({
+      status: "success",
+      data: devices,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching device location details:", error);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+
+
 module.exports = {
     createDevice,
     deviceRegister,
@@ -740,4 +842,5 @@ module.exports = {
 
     getdevicesforuser,
     deviceGarbageCountUpdate,
+    deviceLocationDetails
 }

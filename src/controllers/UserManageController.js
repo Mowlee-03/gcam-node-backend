@@ -373,7 +373,7 @@ const updateUser = async (req, res) => {
   const { username, fullname, mobile, role, password } = req.body;
 
   try {
-    if (!user_id) {
+    if (!user_id|| isNaN(user_id)) {
       return res.status(400).json({
         status: "error",
         message: "Bad request",
@@ -477,7 +477,7 @@ const deleteUser = async (req, res) => {
   const { user_id } = req.params;
 
   try {
-    if (!user_id) {
+    if (!user_id|| isNaN(user_id)) {
       return res.status(400).json({
         status: "error",
         message: "Bad request, user_id is required",
