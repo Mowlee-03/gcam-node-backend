@@ -249,26 +249,26 @@ const createuser = async (req, res) => {
 const getAllUsers = async (req, res) => {
   try {
     const users = await gcamprisma.user.findMany({
-      include: {
-        organization: {
-          include: {
-            organization: true, // org info
-          },
-        },
-        device_access: {
-          include: {
-            device: {
-              select:{
-                id:true,
-                imei:true,
-                name:true,
-                video_url:true,
-                organization_id:true
-              }
-            }, // device info
-          },
-        },
-      },
+      // include: {
+      //   organization: {
+      //     include: {
+      //       organization: true, // org info
+      //     },
+      //   },
+      //   device_access: {
+      //     include: {
+      //       device: {
+      //         select:{
+      //           id:true,
+      //           imei:true,
+      //           name:true,
+      //           video_url:true,
+      //           organization_id:true
+      //         }
+      //       }, // device info
+      //     },
+      //   },
+      // },
     });
 
     if (!users || users.length === 0) {
@@ -289,54 +289,55 @@ const getAllUsers = async (req, res) => {
             fullname: user.fullname,
             mobile: user.mobile,
             role: user.role,
-            organizations: "ALL",
+            // password: user.password
+            // organizations: "ALL", // commented
           };
         }
 
         // --- USER / ADMIN (org-level)
-        let orgAccess = [];
-        for (const orgLink of user.organization) {
-          const org = orgLink.organization;
+        // let orgAccess = [];
+        // for (const orgLink of user.organization) {
+        //   const org = orgLink.organization;
 
-          if (orgLink.role === "ADMIN") {
-            // ADMIN inside org → all devices of that org
-            const allDevices = await gcamprisma.device.findMany({
-              where: { organization_id: org.id },
-              select:{
-                id:true,
-                imei:true,
-                name:true,
-                video_url:true,
-              }
-            });
+        //   if (orgLink.role === "ADMIN") {
+        //     // ADMIN inside org → all devices of that org
+        //     const allDevices = await gcamprisma.device.findMany({
+        //       where: { organization_id: org.id },
+        //       select:{
+        //         id:true,
+        //         imei:true,
+        //         name:true,
+        //         video_url:true,
+        //       }
+        //     });
 
-            orgAccess.push({
-              id: org.id,
-              name: org.name,
-              org_role: orgLink.role, // ✅ include org_role here
-              access: "ALL",
-              devices: allDevices,
-            });
-          } else {
-           // USER → only specific devices
-            const allowedDevices = user.device_access
-              .filter((ud) => ud.device.organization_id === org.id)
-              .map((ud) => ({
-                id: ud.device.id,
-                imei: ud.device.imei,
-                name: ud.device.name,
-                video_url: ud.device.video_url,
-              }));
+        //     orgAccess.push({
+        //       id: org.id,
+        //       name: org.name,
+        //       org_role: orgLink.role,
+        //       access: "ALL",
+        //       devices: allDevices,
+        //     });
+        //   } else {
+        //    // USER → only specific devices
+        //     const allowedDevices = user.device_access
+        //       .filter((ud) => ud.device.organization_id === org.id)
+        //       .map((ud) => ({
+        //         id: ud.device.id,
+        //         imei: ud.device.imei,
+        //         name: ud.device.name,
+        //         video_url: ud.device.video_url,
+        //       }));
 
-            orgAccess.push({
-              id: org.id,
-              name: org.name,
-              org_role: orgLink.role, // ✅ include org_role here
-              access: "LIMITED",
-              devices: allowedDevices,
-            });
-          }
-        }
+        //     orgAccess.push({
+        //       id: org.id,
+        //       name: org.name,
+        //       org_role: orgLink.role,
+        //       access: "LIMITED",
+        //       devices: allowedDevices,
+        //     });
+        //   }
+        // }
 
         return {
           id: user.id,
@@ -344,7 +345,8 @@ const getAllUsers = async (req, res) => {
           fullname: user.fullname,
           mobile: user.mobile,
           role: user.role,
-          organizations: orgAccess,
+          // password: user.password,
+          // organizations: orgAccess,
         };
       })
     );
@@ -364,10 +366,11 @@ const getAllUsers = async (req, res) => {
 };
 
 
+
 //PUT - /api/user/update/:user_id
 const updateUser = async (req, res) => {
   const { user_id } = req.params;
-  const { username, fullname, mobile, role, } = req.body;
+  const { username, fullname, mobile, role, password } = req.body;
 
   try {
     if (!user_id) {
@@ -378,7 +381,7 @@ const updateUser = async (req, res) => {
     }
 
     // ✅ Check for extra fields
-    const allowedFields = ["username", "fullname", "mobile", "role"];
+    const allowedFields = ["username", "fullname", "mobile", "role", "password"];
     const extraFields = Object.keys(req.body).filter(
       (key) => !allowedFields.includes(key)
     );
@@ -414,6 +417,7 @@ const updateUser = async (req, res) => {
     if (fullname) updateData.fullname = fullname;
     if (mobile) updateData.mobile = mobile;
 
+    // ✅ Handle role update
     if (role && role !== existingUser.role) {
       if (!globalroles.includes(role)) {
         return res.status(400).json({
@@ -433,6 +437,11 @@ const updateUser = async (req, res) => {
           where: { user_id: Number(user_id) },
         });
       }
+    }
+
+    // ✅ Handle password update with hashing
+    if (password) {
+      updateData.password = await hashPassword(password);
     }
 
     if (Object.keys(updateData).length === 0) {

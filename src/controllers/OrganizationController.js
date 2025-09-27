@@ -298,6 +298,12 @@ const removeOrgAccess = async (req, res) => {
     const results = [];
 
     for (const org of organization) {
+      if (!org.id||!org.name) {
+        return res.status(400).json({
+          status: "error",
+          message: "Bad request, organization id and name are required",
+        });
+      }
       const assigned = await gcamprisma.userOrganization.findUnique({
         where: {
           user_id_organization_id: {
