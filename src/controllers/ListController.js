@@ -250,6 +250,146 @@ const getloggedUserDeviceList = async (req, res) => {
 };
 
 
+// GET - /api/dashboard/device-status/:user_id
+const dashboardDeviceStatus = async (req, res) => {
+  try {
+    let { user_id } = req.params;
+    if (!user_id) {
+      return res.status(400).json({
+        status: "error",
+        message: "Bad request, missing user_id",
+      });
+    }
+
+    user_id = Number(user_id);
+
+    // Fetch user with orgs and devices
+    const user = await gcamprisma.user.findUnique({
+      where: { id: user_id },
+      include: {
+        organization: {
+          include: {
+            organization: true,
+          },
+        },
+        device_access: {
+          include: {
+            device: {
+              select: {
+                id: true,
+                imei: true,
+                name: true,
+                max_count: true,
+                is_active: true,
+                site: { select: { name: true } },
+                latestlog: {
+                  select: {
+                    box_count: true,
+                    garbage_date: true,
+                    garbage_image: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        status: "error",
+        message: "User not found",
+      });
+    }
+
+    // Block SUPERADMIN
+    if (user.role === "SUPERADMIN") {
+      return res.status(403).json({
+        status: "error",
+        message: "Access denied for SUPERADMIN, this data is only for USER",
+      });
+    }
+
+    let devices = [];
+
+    for (const orgLink of user.organization) {
+      const org = orgLink.organization;
+
+      if (orgLink.role === "ADMIN") {
+        // Admin: all devices in org
+        const allDevices = await gcamprisma.device.findMany({
+          where: { organization_id: org.id },
+          select: {
+            id: true,
+            imei: true,
+            name: true,
+            max_count: true,
+            is_active: true,
+            site: { select: { name: true } },
+            latestlog: {
+              select: {
+                box_count: true,
+                garbage_date: true,
+                garbage_image: true,
+              },
+            },
+          },
+        });
+        devices.push(...allDevices);
+      } else {
+        // User: only allowed devices
+        const allowedDevices = user.device_access
+          .filter((ud) => ud.device.organization_id === org.id)
+          .map((ud) => ud.device);
+        devices.push(...allowedDevices);
+      }
+    }
+
+    // ✅ Compute device status
+    const result = devices.map((d) => {
+      let status = "unknown";
+      if (d.latestlog && d.max_count) {
+        const boxCount = d.latestlog.box_count;
+        const max = d.max_count;
+
+        if (boxCount >= max) {
+          status = "danger";
+        } else if (boxCount >= max * 0.75) {
+          status = "medium";
+        } else {
+          status = "good";
+        }
+      }
+
+      return {
+        id: d.id,
+        imei: d.imei,
+        name: d.name,
+        site_name: d.site?.name || null,
+        max_count: d.max_count,
+        box_count: d.latestlog?.box_count || 0,
+        garbage_date: d.latestlog?.garbage_date || null,
+        garbage_image: d.latestlog?.garbage_image || null,
+        is_active: d.is_active,
+        status,
+      };
+    });
+
+    return res.json({
+      status: "success",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Error in dashboardDeviceStatus:", error);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
 
 module.exports = {
     getOrganizationList,

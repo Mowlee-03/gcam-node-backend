@@ -829,6 +829,43 @@ const deviceLocationDetails = async (req, res) => {
 };
 
 
+// GET - /api/device/:device_id/latest/garbage_log
+const deviceLatestgarbageLog = async (req,res) => {
+  try {
+    const {device_id}=req.params
+
+    if (!device_id || isNaN(device_id)) {
+      return res.status(400).json({
+        status:"error",
+        message:"Bad request , missing device_id"
+      })
+    }
+
+    const latest_data  = await gcamprisma.latestLog.findUnique({
+      where:{ device_id:Number(device_id) },
+      select:{
+        imei:true,
+        garbage_image:true,
+        garbage_date:true,
+        box_count:true,
+      }
+    })
+
+    return res.status(200).json({
+      status:"success",
+      data:latest_data
+    })
+
+  } catch (error) {
+    console.error("❌ Error fetching device latest ", error);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+}
+
 
 module.exports = {
     createDevice,
@@ -842,5 +879,6 @@ module.exports = {
 
     getdevicesforuser,
     deviceGarbageCountUpdate,
-    deviceLocationDetails
+    deviceLocationDetails,
+    deviceLatestgarbageLog
 }

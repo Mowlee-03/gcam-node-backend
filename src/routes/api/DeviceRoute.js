@@ -9,7 +9,8 @@ const {
     deviceGarbageCountUpdate,
     getAllDevcies,
     updateDevice,
-    deviceLocationDetails
+    deviceLocationDetails,
+    deviceLatestgarbageLog
 } = require("../../controllers/DeviceController")
 var router = express.Router()
 
@@ -26,4 +27,5 @@ router.delete("/remove/access/:user_id",removeDeviceAccess)
 router.get("/viewall/:user_id",getdevicesforuser)
 router.put("/garbage_count/update/:device_id",deviceGarbageCountUpdate)
 router.get("/location/details/:user_id",deviceLocationDetails)
+router.get("/:device_id/latest/garbage_log",deviceLatestgarbageLog)
 module.exports = router
