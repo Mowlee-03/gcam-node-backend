@@ -117,13 +117,13 @@ model UserDevice {
   @@unique([user_id,device_id])
 }
 
-        //  {
-        //     "site_name": "site_name",
-        //     "imei" :"imei", 
-        //     "dt" :"date",
-        //     "image_name" :$image_name,(file)
-        //     "box_count" :$box_count
-        // };
+  // {
+  //     "site_name": "site_name",
+  //     "imei" :"imei", 
+  //     "dt" :"date",
+  //     "image_name" :$image_name,(file)
+  //     "box_count" :$box_count
+  // };
 model GarbageLog {
   id                Int                 @id @default(autoincrement())
   device_id         Int?
@@ -144,12 +144,12 @@ model GarbageLog {
   @@index([device_id])
   @@index([date])
 }
-        //  {
-        //     "site_name": "site_name",
-        //     "imei" :"imei", 
-        //     "dt" :"date",
-        //     "image_name" :$image_name,(file)
-        // };
+  // {
+  //     "site_name": "site_name",
+  //     "imei" :"imei", 
+  //     "dt" :"date",
+  //     "image_name" :$image_name,(file)
+  // };
 model PersonLog {
   id                Int                 @id @default(autoincrement())
   device_id         Int?

@@ -8,6 +8,8 @@ var indexRouter = require('./src/routes/index');
 var apiRouter = require('./src/routes/apiRoute');
 var publicRouter = require("./src/routes/publicRoute");
 const authMiddleware = require('./src/middleware/authMiddleware');
+
+
 var app = express();
 
 // view engine setup

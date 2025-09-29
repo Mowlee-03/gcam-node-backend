@@ -43,7 +43,6 @@ const inituser = async (req, res) => {
     return res.status(201).json({
       status: "success",
       message: "First user created successfully",
-      data: newUser
     });
   } catch (error) {
     console.error("❌ Error creating initial user:", error);

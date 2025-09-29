@@ -69,6 +69,7 @@ CREATE TABLE `Device` (
     `organization_id` INTEGER NULL,
     `max_count` INTEGER NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `is_active` BOOLEAN NOT NULL DEFAULT true,
 
     UNIQUE INDEX `Device_imei_key`(`imei`),
     PRIMARY KEY (`id`)
@@ -87,13 +88,15 @@ CREATE TABLE `UserDevice` (
 -- CreateTable
 CREATE TABLE `GarbageLog` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
-    `device_id` INTEGER NOT NULL,
+    `device_id` INTEGER NULL,
     `imei` VARCHAR(191) NOT NULL,
     `organization_name` VARCHAR(191) NOT NULL,
     `site_name` VARCHAR(191) NOT NULL,
     `date` DATETIME(3) NOT NULL,
     `image` VARCHAR(191) NOT NULL,
     `box_count` INTEGER NOT NULL,
+    `org_id` INTEGER NULL,
+    `site_id` INTEGER NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
     INDEX `GarbageLog_device_id_idx`(`device_id`),
@@ -104,12 +107,14 @@ CREATE TABLE `GarbageLog` (
 -- CreateTable
 CREATE TABLE `PersonLog` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
-    `device_id` INTEGER NOT NULL,
+    `device_id` INTEGER NULL,
     `imei` VARCHAR(191) NOT NULL,
     `organization_name` VARCHAR(191) NOT NULL,
     `site_name` VARCHAR(191) NOT NULL,
     `date` DATETIME(3) NOT NULL,
     `image` VARCHAR(191) NOT NULL,
+    `org_id` INTEGER NULL,
+    `site_id` INTEGER NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
     INDEX `PersonLog_device_id_idx`(`device_id`),
@@ -124,8 +129,11 @@ CREATE TABLE `LatestLog` (
     `imei` VARCHAR(191) NOT NULL,
     `organization_name` VARCHAR(191) NOT NULL,
     `site_name` VARCHAR(191) NOT NULL,
+    `box_count` INTEGER NOT NULL,
     `garbage_image` VARCHAR(191) NOT NULL,
     `person_image` VARCHAR(191) NOT NULL,
+    `garbage_date` DATETIME(3) NOT NULL,
+    `person_date` DATETIME(3) NOT NULL,
     `update_at` DATETIME(3) NOT NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
@@ -167,10 +175,22 @@ ALTER TABLE `UserDevice` ADD CONSTRAINT `UserDevice_user_id_fkey` FOREIGN KEY (`
 ALTER TABLE `UserDevice` ADD CONSTRAINT `UserDevice_device_id_fkey` FOREIGN KEY (`device_id`) REFERENCES `Device`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `GarbageLog` ADD CONSTRAINT `GarbageLog_device_id_fkey` FOREIGN KEY (`device_id`) REFERENCES `Device`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `GarbageLog` ADD CONSTRAINT `GarbageLog_org_id_fkey` FOREIGN KEY (`org_id`) REFERENCES `Organization`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `PersonLog` ADD CONSTRAINT `PersonLog_device_id_fkey` FOREIGN KEY (`device_id`) REFERENCES `Device`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `GarbageLog` ADD CONSTRAINT `GarbageLog_site_id_fkey` FOREIGN KEY (`site_id`) REFERENCES `Site`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `GarbageLog` ADD CONSTRAINT `GarbageLog_device_id_fkey` FOREIGN KEY (`device_id`) REFERENCES `Device`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `PersonLog` ADD CONSTRAINT `PersonLog_org_id_fkey` FOREIGN KEY (`org_id`) REFERENCES `Organization`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `PersonLog` ADD CONSTRAINT `PersonLog_site_id_fkey` FOREIGN KEY (`site_id`) REFERENCES `Site`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `PersonLog` ADD CONSTRAINT `PersonLog_device_id_fkey` FOREIGN KEY (`device_id`) REFERENCES `Device`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `LatestLog` ADD CONSTRAINT `LatestLog_device_id_fkey` FOREIGN KEY (`device_id`) REFERENCES `Device`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
