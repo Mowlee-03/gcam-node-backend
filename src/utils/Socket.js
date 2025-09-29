@@ -12,8 +12,9 @@ module.exports = (server, app) => {
   // Make io accessible in controllers
   app.locals.io = io;
 
+console.log("✅ Socket.IO initialized and listening for connections");
   io.on("connection", (socket) => {
-    console.log("New client connected:", socket.id);
+    console.log("🔌 New client connected:", socket.id);
 
     // Join a device room
     socket.on("joinDeviceRoom", (deviceId) => {

@@ -21,7 +21,7 @@ app.set('port', port);
 
 var server = http.createServer(app);
 
-
+ 
 /**
  * Initialize Socket.IO
  */
@@ -31,7 +31,9 @@ const io = initSocket(server,app)
  * Listen on provided port, on all network interfaces.
  */
 
-server.listen(port);
+server.listen(port,()=>{
+  console.log(`🚀 Server running `)
+});
 server.on('error', onError);
 server.on('listening', onListening);
 
