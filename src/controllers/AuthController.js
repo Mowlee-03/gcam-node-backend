@@ -158,16 +158,20 @@ const authuser = async (req, res) => {
 
         if (orgLink.role === "ADMIN") {
             // ADMIN inside org → all devices of that org
+            const alldevices = await gcamprisma.device.findMany({
+              where: { organization_id: org.id ,is_active:true},
+              select:{ id: true }
+            })
             orgAccess.push({
             id: org.id,
             //   name: org.name,
             role: orgLink.role,
-            devices: "ALL",
+            devices: alldevices.map((d)=>d.id),
             });
         } else {
             // USER inside org → only specific devices linked
             const allowedDevices = user.device_access
-                .filter((ud) => ud.device.organization_id === org.id)
+                .filter((ud) => ud.device.organization_id === org.id&&ud.device.is_active)
                 .map((ud) => ud.device.id); // ✅ only return ID
 
             orgAccess.push({
