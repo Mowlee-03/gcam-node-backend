@@ -13,6 +13,7 @@ const {
     deviceLatestgarbageLog,
     getDeviceswithGarbageCount
 } = require("../../controllers/DeviceController")
+const { oneDayPersonLogsData } = require("../../controllers/logs/PersonController")
 var router = express.Router()
 
 
@@ -30,4 +31,5 @@ router.get("/garbage_count/:user_id",getDeviceswithGarbageCount)
 router.put("/garbage_count/update/:device_id",deviceGarbageCountUpdate)
 router.get("/location/details/:user_id",deviceLocationDetails)
 router.get("/:device_id/latest/garbage_log",deviceLatestgarbageLog)
+router.post("/person/data",oneDayPersonLogsData)
 module.exports = router
