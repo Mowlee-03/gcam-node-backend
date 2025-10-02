@@ -86,7 +86,7 @@ const getRegisteredDeviceList = async (req,res) => {
             }
 
             const devices = await gcamprisma.device.findMany({
-                where:{organization_id:{in:org_ids}},
+                where:{organization_id:{in:org_ids},is_active:true},
                 select : { 
                     id      :   true,
                     imei    :   true,
@@ -100,6 +100,7 @@ const getRegisteredDeviceList = async (req,res) => {
             })
         }else if (org_ids==="ALL") {
             const devices = await gcamprisma.device.findMany({
+                where:{is_active:true},
                 select : { 
                     id      :   true,
                     imei    :   true,
@@ -183,6 +184,7 @@ const getloggedUserDeviceList = async (req, res) => {
                 imei: true,
                 name: true,
                 organization_id: true,
+                is_active:true
               },
             },
           },
@@ -214,7 +216,7 @@ const getloggedUserDeviceList = async (req, res) => {
       if (orgLink.role === "ADMIN") {
         // Admin: all devices in this org
         const allDevices = await gcamprisma.device.findMany({
-          where: { organization_id: org.id },
+          where: { organization_id: org.id ,is_active:true},
           select: {
             id: true,
             imei: true,
@@ -225,7 +227,7 @@ const getloggedUserDeviceList = async (req, res) => {
       } else {
         // User: only allowed devices
         const allowedDevices = user.device_access
-          .filter((ud) => ud.device.organization_id === org.id)
+          .filter((ud) => ud.device.organization_id === org.id&&ud.device.is_active)
           .map((ud) => ({
             id: ud.device.id,
             imei: ud.device.imei,

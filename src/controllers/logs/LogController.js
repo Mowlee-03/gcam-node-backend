@@ -1,9 +1,11 @@
-const {PrismaClient}=require("../../generated/prisma")
+const {PrismaClient}=require("../../generated/prisma");
+const { deleteImage } = require("../../utils/Multer");
 const gcamprisma = new PrismaClient()
 
-
+// POST - /gcam/common/garbage/log
 const garbagelog = async (req, res) => {
-    const io = req.app.locals.io
+    const io = req.app.locals.io;
+
     const saveMissedLog = async (problem) => {
         try {
             await gcamprisma.missedlog.create({
@@ -31,6 +33,7 @@ const garbagelog = async (req, res) => {
 
         // Validate required fields
         if (!site_name || !imei || !dt || !box_count) {
+            await deleteImage("garbage", filename);
             const msg = "Missing required fields";
             await saveMissedLog(msg);
             return res.status(400).json({ status: "error", message: msg });
@@ -39,6 +42,7 @@ const garbagelog = async (req, res) => {
         // Validate datetime
         const parsedDate = new Date(dt);
         if (isNaN(parsedDate.getTime())) {
+            await deleteImage("garbage", filename);
             const msg = "Invalid date/time format";
             await saveMissedLog(msg);
             return res.status(400).json({ status: "error", message: msg });
@@ -47,6 +51,7 @@ const garbagelog = async (req, res) => {
         // Validate box_count
         const boxCount = parseInt(box_count, 10);
         if (isNaN(boxCount)) {
+            await deleteImage("garbage", filename);
             const msg = "Invalid box_count (must be a number)";
             await saveMissedLog(msg);
             return res.status(400).json({ status: "error", message: msg });
@@ -55,12 +60,14 @@ const garbagelog = async (req, res) => {
         // Check if device exists in installedDevice
         const checkRegister = await gcamprisma.installedDevice.findUnique({ where: { imei } });
         if (!checkRegister) {
+            await deleteImage("garbage", filename);
             const msg = "Device not found";
             await saveMissedLog(msg);
             return res.status(404).json({ status: "error", message: msg });
         }
 
         if (!checkRegister.is_registered) {
+            await deleteImage("garbage", filename);
             const msg = "Device not registered yet";
             await saveMissedLog(msg);
             return res.status(400).json({ status: "error", message: msg });
@@ -78,6 +85,7 @@ const garbagelog = async (req, res) => {
         });
 
         if (!Device) {
+            await deleteImage("garbage", filename);
             const msg = "Device not registered or not found";
             await saveMissedLog(msg);
             return res.status(404).json({ status: "error", message: msg });
@@ -123,24 +131,21 @@ const garbagelog = async (req, res) => {
             }
         });
 
-        // Emit only to the room for that device_id
+         // Emit only to the room for that device_id
         io.to(`device_${Device.id}`).emit("garbageUpdate", {
             device_id: Device.id,
             imei,
-            // site_name: Device.site?.name || "N/A",
             box_count: boxCount,
-            // date: parsedDate,
-            // image: imagePath
         });
 
         return res.status(200).json({
             status: "success",
             message: "Garbage log added & LatestLog updated",
-            data: newLog
         });
 
     } catch (error) {
         console.error(error);
+        await deleteImage("garbage", req.file?.filename); // 🔹 delete image on any server error
         await saveMissedLog(error.message);
         return res.status(500).json({
             status: "error",
@@ -150,6 +155,7 @@ const garbagelog = async (req, res) => {
     }
 };
 
+// POST - /gcam/common/person/log
 const personlog = async (req, res) => {
     const saveMissedLog = async (problem) => {
         try {
@@ -178,6 +184,7 @@ const personlog = async (req, res) => {
 
         // Validate required fields
         if (!site_name || !imei || !dt) {
+            await deleteImage("person", filename);
             const msg = "Missing required fields";
             await saveMissedLog(msg);
             return res.status(400).json({ status: "error", message: msg });
@@ -186,6 +193,7 @@ const personlog = async (req, res) => {
         // Validate datetime
         const parsedDate = new Date(dt);
         if (isNaN(parsedDate.getTime())) {
+            await deleteImage("person", filename);
             const msg = "Invalid date/time format";
             await saveMissedLog(msg);
             return res.status(400).json({ status: "error", message: msg });
@@ -194,12 +202,14 @@ const personlog = async (req, res) => {
         // Check if device exists in installedDevice
         const checkRegister = await gcamprisma.installedDevice.findUnique({ where: { imei } });
         if (!checkRegister) {
+            await deleteImage("person", filename);
             const msg = "Device not found";
             await saveMissedLog(msg);
             return res.status(404).json({ status: "error", message: msg });
         }
 
         if (!checkRegister.is_registered) {
+            await deleteImage("person", filename);
             const msg = "Device not registered yet";
             await saveMissedLog(msg);
             return res.status(400).json({ status: "error", message: msg });
@@ -217,6 +227,7 @@ const personlog = async (req, res) => {
         });
 
         if (!Device) {
+            await deleteImage("person", filename);
             const msg = "Device not registered or not found";
             await saveMissedLog(msg);
             return res.status(404).json({ status: "error", message: msg });
@@ -263,11 +274,11 @@ const personlog = async (req, res) => {
         return res.status(200).json({
             status: "success",
             message: "Person log added & LatestLog updated",
-            data: newLog
         });
 
     } catch (error) {
         console.error(error);
+        await deleteImage("person", req.file?.filename); // 🔹 delete image on any server error
         await saveMissedLog(error.message);
         return res.status(500).json({
             status: "error",
@@ -276,6 +287,7 @@ const personlog = async (req, res) => {
         });
     }
 };
+
 
 
 module.exports = {
