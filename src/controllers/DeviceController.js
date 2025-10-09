@@ -114,11 +114,21 @@ const deviceRegister = async (req, res) => {
       });
     }
 
-    if (location && !Array.isArray(location)) {
-      return res.status(400).json({
-        status:"error",
-        message:"Invalid location data"
-      })
+     // Validate location array
+    let validatedLocation = null;
+    if (location) {
+      if (
+        !Array.isArray(location) ||
+        location.length !== 2 ||
+        typeof location[0] !== "number" ||
+        typeof location[1] !== "number"
+      ) {
+        return res.status(400).json({
+          status: "error",
+          message: "Invalid location format. Expected [latitude, longitude] as numbers"
+        });
+      }
+      validatedLocation = location;
     }
     const [createdDevice] = await gcamprisma.$transaction([
       gcamprisma.device.create({
@@ -126,7 +136,7 @@ const deviceRegister = async (req, res) => {
           imei,
           video_url,
           name: name ?? null,
-          location: location ?? null,
+          location: validatedLocation,
           site_id: Number(site_id),
           organization_id: Number(organization_id),
           max_count: max_count ?? null
@@ -281,7 +291,28 @@ const updateDevice = async (req, res) => {
       updateData.site_id = Number(site_id);
     }
 
-    if (location && location !== device.location) updateData.location = location;
+   // Update location ONLY if it is a valid array [lat, lng]
+    if (location) {
+      if (
+        !Array.isArray(location) ||
+        location.length !== 2 ||
+        typeof location[0] !== "number" ||
+        typeof location[1] !== "number"
+      ) {
+        return res.status(400).json({
+          status: "error",
+          message: "Invalid location format. Expected [latitude, longitude] as numbers"
+        });
+      }
+      // Only update if changed
+      if (
+        !device.location ||
+        device.location[0] !== location[0] ||
+        device.location[1] !== location[1]
+      ) {
+        updateData.location = location;
+      }
+    }
 
     if (is_active !== undefined && is_active !== device.is_active) {
       updateData.is_active = Boolean(is_active);
@@ -385,8 +416,8 @@ const addDeviceAccess = async (req, res) => {
     // 🔹 Step 2: Fetch devices
     const deviceList = await gcamprisma.device.findMany({
       where: { id: { in: devices.map(Number) } },
-      select: { id: true, organization_id: true , name:true ,imei:true },
-      include:{organization:{select:{name:true}}}
+      select: { id: true, organization_id: true , name:true ,imei:true,organization:{select:{name:true}} },
+      // include:{organization:{select:{name:true}}}
     });
 
     if (deviceList.length !== devices.length) {
